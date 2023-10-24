@@ -104,14 +104,19 @@ std::ostream& XM_CALLCONV operator<<(std::ostream& os, FXMMATRIX m)
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+	OutputDebugStringA("WinMain Start\n");
+	
+	
 	BoxApp app(hInstance);
 	app.Init();
 	app.Main();
+	
 	return 0;
 }
 
 void BoxApp::Render()
 {
+
 	if (Device == nullptr)
 	{
 		return;
@@ -138,7 +143,7 @@ void BoxApp::Render()
 	}
 
 	ThrowIfFailed(CommandAllocator->Reset());
-	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
+	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), PipelineState.Get()));
 
 	CommandList->RSSetViewports(1, &Viewport);
 	CommandList->RSSetScissorRects(1, &ScissorRect);
@@ -147,7 +152,7 @@ void BoxApp::Render()
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
 
-	float clearColor[] = { 0.1f, 0.2f, 0.1f, 1.0f };
+	float clearColor[] = { 0.3f, 0.2f, 0.1f, 1.0f };
 	CommandList->ClearRenderTargetView(CurrentBackBufferView(), clearColor, 0, nullptr);
 
 	CommandList->ClearDepthStencilView(DepthStencilView(),
@@ -188,6 +193,7 @@ void BoxApp::Render()
 
 void BoxApp::Init()
 {
+	OutputDebugStringA("Init Start\n");
 	D3D12App::Init();
 
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
@@ -205,6 +211,7 @@ void BoxApp::Init()
 	CommandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
 	FlushCommandQueue();
 
+	OutputDebugStringA("Init Done\n");
 }
 
 void BoxApp::BuildRootSignature()
@@ -252,7 +259,7 @@ void BoxApp::BuildShadersAndInputLayout()
 
 void BoxApp::BuildBoxGeometry()
 {
-	float Color[4] = { 0.5f, 1.0f, 0.5f, 1.0f };
+	float Color[4] = { 0.1f, 1.0f, 0.5f, 1.0f };
 	std::array<Vertex, 8> vertices = {
 		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Color) }),
 		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Color) }),
@@ -343,10 +350,10 @@ void BoxApp::BuildPSO()
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	psoDesc.RTVFormats[0] = BackBufferFormat;
 	psoDesc.SampleDesc.Count = 1;
 	psoDesc.SampleDesc.Quality = 0;
-	psoDesc.DSVFormat = DXGI_FORMAT_R24G8_TYPELESS;
+	psoDesc.DSVFormat = DepthStencilFormat;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(PipelineState.GetAddressOf())));
 
 }

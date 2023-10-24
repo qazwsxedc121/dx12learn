@@ -10,6 +10,10 @@ D3D12App::D3D12App(HINSTANCE hInstance)
 
 void D3D12App::Init()
 {
+    if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+    {
+        LoadLibrary(GetLatestWinPixGpuCapturerPath().c_str());
+    }
     InitWindow();
     InitFactory();
     InitDevice();
@@ -44,12 +48,14 @@ void D3D12App::InitFactory()
 void D3D12App::InitDevice()
 {
 
-//    ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
+    ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
+    /*
     {
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(Factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
         ThrowIfFailed(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
     }
+    */
 
     ThrowIfFailed(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence)));
 }
@@ -260,7 +266,7 @@ void D3D12App::OnResize()
         2,
         ClientWidth,
         ClientHeight,
-        DXGI_FORMAT_R8G8B8A8_UNORM,
+        BackBufferFormat,
         DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH
     ));
 
@@ -282,7 +288,7 @@ void D3D12App::OnResize()
     depthStencilDesc.DepthOrArraySize = 1;
     depthStencilDesc.MipLevels = 1;
 
-    depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+    depthStencilDesc.Format = DepthStencilFormat;
     depthStencilDesc.SampleDesc.Count = 1;
     depthStencilDesc.SampleDesc.Quality = 0;
     depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
