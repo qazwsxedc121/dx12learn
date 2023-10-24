@@ -1,13 +1,5 @@
 #pragma once
-
-inline void ThrowIfFailed(HRESULT hr)
-{
-	if (FAILED(hr))
-	{
-		// Set a breakpoint on this line to catch DirectX API errors
-		throw std::exception();
-	}
-}
+#include "D3DUtil.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -16,7 +8,7 @@ class D3D12App
 
 public:
 	D3D12App(HINSTANCE hInstance);
-	void Init();
+	virtual void Init();
     void Main();
 
 	virtual void Render();
@@ -38,6 +30,9 @@ protected:
 	ComPtr<ID3D12Resource> DepthStencilBuffer;
 
 
+	D3D12_VIEWPORT Viewport;
+	D3D12_RECT ScissorRect;
+
 	UINT RtvDescriptorSize;
 	UINT DsvDescriptorSize;
 	UINT CbvSrvUavDescriptorSize;
@@ -55,6 +50,11 @@ protected:
 	void InitDescriptorHeap();
 	void OnResize();
 	void FlushCommandQueue();
+
+	ID3D12Resource* CurrentBackBuffer()const;
+	D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView()const;
+	D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView()const;
+
 
 	HWND mHWnd;
 	static LRESULT CALLBACK StaticWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

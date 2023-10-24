@@ -1,8 +1,21 @@
 #pragma once
+#include <DirectXCollision.h>
+#include <unordered_map>
 
+using Microsoft::WRL::ComPtr;
+
+inline void ThrowIfFailed(HRESULT hr)
+{
+	if (FAILED(hr))
+	{
+		// Set a breakpoint on this line to catch DirectX API errors
+		throw std::exception();
+	}
+}
 
 class D3DUtil
 {
+public:
     static UINT CalcConstantBufferByteSize(UINT byteSize)
     {
         // Constant buffers must be a multiple of the minimum hardware
@@ -17,6 +30,76 @@ class D3DUtil
         // 0x0200
         // 512
         return (byteSize + 255) & ~255;
+    };
+
+    static ComPtr<ID3D12Resource> CreateDefaultBuffer(
+        ID3D12Device* device,
+        ID3D12GraphicsCommandList* cmdList,
+        const void* initData,
+        UINT64 byteSize,
+        ComPtr<ID3D12Resource>& uploadBuffer);
+
+    static ComPtr<ID3DBlob> LoadBinary(const std::wstring& filename);
+
+    static ComPtr<ID3DBlob> CompileShader(
+        const std::wstring& filename,
+        const D3D_SHADER_MACRO* defines,
+        const std::string& entrypoint,
+        const std::string& target);
+};
+
+struct SubmeshGeometry
+{
+    UINT IndexCount = 0;
+    UINT StartIndexLocation = 0;
+    INT BaseVertexLocation = 0;
+
+    DirectX::BoundingBox Bounds;
+};
+
+struct MeshGeometry
+{
+    std::string Name;
+    ComPtr<ID3DBlob> VertexBufferCPU = nullptr;
+    ComPtr<ID3DBlob> IndexBufferCPU = nullptr;
+
+    ComPtr<ID3D12Resource> VertexBufferGPU = nullptr;
+    ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
+
+    ComPtr<ID3D12Resource> VertexBufferUploader = nullptr;
+    ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
+
+    UINT VertexByteStride = 0;
+    UINT VertexBufferByteSize = 0;
+    DXGI_FORMAT IndexFormat = DXGI_FORMAT_R16_UINT;
+    UINT IndexBufferByteSize = 0;
+
+    std::unordered_map<std::string, SubmeshGeometry> DrawArgs;
+
+    D3D12_VERTEX_BUFFER_VIEW VertexBufferView()const
+    {
+        D3D12_VERTEX_BUFFER_VIEW vbv;
+        vbv.BufferLocation = VertexBufferGPU->GetGPUVirtualAddress();
+        vbv.StrideInBytes = VertexByteStride;
+        vbv.SizeInBytes = VertexBufferByteSize;
+
+        return vbv;
+    }
+
+    D3D12_INDEX_BUFFER_VIEW IndexBufferView()const
+    {
+        D3D12_INDEX_BUFFER_VIEW ibv;
+        ibv.BufferLocation = IndexBufferGPU->GetGPUVirtualAddress();
+        ibv.Format = IndexFormat;
+        ibv.SizeInBytes = IndexBufferByteSize;
+
+        return ibv;
+    }
+
+    void DisposeUploaders()
+    {
+        VertexBufferUploader = nullptr;
+        IndexBufferUploader = nullptr;
     }
 };
 
@@ -34,11 +117,12 @@ public:
         {
             ElementByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(T));
         }
-
+        D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(ElementByteSize * elementCount);
         ThrowIfFailed(device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // Upload heap
+            &heapProperties, // Upload heap
             D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(ElementByteSize * elementCount), // Resource description for a buffer
+            &resourceDesc, // Resource description for a buffer
             D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
             nullptr,
             IID_PPV_ARGS(&Buffer)));

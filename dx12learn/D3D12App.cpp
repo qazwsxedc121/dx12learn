@@ -23,8 +23,7 @@ void D3D12App::InitFactory()
 {
     UINT dxgiFactoryFlags = 0;
 
-//#if defined(_DEBUG)
-#if 0
+#if defined(_DEBUG)
     // Enable the debug layer (requires the Graphics Tools "optional feature").
     // NOTE: Enabling the debug layer after device creation will invalidate the active device.
     {
@@ -45,7 +44,12 @@ void D3D12App::InitFactory()
 void D3D12App::InitDevice()
 {
 
-    ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
+//    ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
+    {
+        ComPtr<IDXGIAdapter> warpAdapter;
+        ThrowIfFailed(Factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+        ThrowIfFailed(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)));
+    }
 
     ThrowIfFailed(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence)));
 }
@@ -113,7 +117,7 @@ LRESULT D3D12App::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
         }
         case WM_PAINT:
         {
-
+            Render();
             return 0;
         }
         case WM_SIZE:
@@ -179,6 +183,25 @@ LRESULT D3D12App::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 
     }
     return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+ID3D12Resource *D3D12App::CurrentBackBuffer() const
+{
+    return SwapChainBuffer[CurrentBackBufferIndex].Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12App::CurrentBackBufferView() const
+{
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+        RtvHeap->GetCPUDescriptorHandleForHeapStart(),
+        CurrentBackBufferIndex,
+        RtvDescriptorSize
+    );
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12App::DepthStencilView() const
+{
+    return DsvHeap->GetCPUDescriptorHandleForHeapStart();
 }
 
 void D3D12App::InitWindow()
@@ -294,7 +317,14 @@ void D3D12App::OnResize()
 
     FlushCommandQueue();
 
+    Viewport.TopLeftX = 0;
+    Viewport.TopLeftY = 0;
+    Viewport.Width = static_cast<float>(ClientWidth);
+    Viewport.Height = static_cast<float>(ClientHeight);
+    Viewport.MinDepth = 0.0f;
+    Viewport.MaxDepth = 1.0f;
 
+    ScissorRect = { 0, 0, ClientWidth, ClientHeight };
 }
 
 void D3D12App::FlushCommandQueue()
