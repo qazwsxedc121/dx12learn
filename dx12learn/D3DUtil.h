@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <shlobj.h>
 #include <strsafe.h>
+#include "MathHelper.h"
 
 
 using Microsoft::WRL::ComPtr;
@@ -150,6 +151,13 @@ struct MeshGeometry
     }
 };
 
+struct MaterialConstants
+{
+    XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float Roughtness = .25f;
+    XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+};
 
 template<typename T>
 class UploadBuffer

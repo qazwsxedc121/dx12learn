@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\MeshBuilder">
+      <UniqueIdentifier>{6e85018b-7356-4130-8822-3976deb61832}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\MeshBuilder">
+      <UniqueIdentifier>{b5d06459-8df8-4feb-9ca9-babf67fffb4b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -30,6 +36,12 @@
     <ClCompile Include="D3DUtil.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="FrameResource.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshBoxBuilder.cpp">
+      <Filter>源文件\MeshBuilder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -46,6 +58,12 @@
     </ClInclude>
     <ClInclude Include="D3DUtil.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameResource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshBoxBuilder.h">
+      <Filter>头文件\MeshBuilder</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
