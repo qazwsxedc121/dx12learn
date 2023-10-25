@@ -1,9 +1,9 @@
 #pragma once
 #include "../D3DUtil.h"
-class BoxBuilder
+#include "MeshBuilder.h"
+
+class BoxBuilder : MeshBuilder
 {
 public:
-    static bool BuildBox(std::unique_ptr<MeshGeometry> &BoxGeo, ComPtr<ID3D12Device> Device, ComPtr<ID3D12GraphicsCommandList> CommandList,
-        float Width, float Height, float Depth
-    );
+    MeshData BuildBox(float Width, float Height, float Depth, uint32 NumSubdivisions);
 };

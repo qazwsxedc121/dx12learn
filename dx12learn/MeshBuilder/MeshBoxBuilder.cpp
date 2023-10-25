@@ -2,91 +2,97 @@
 
 #include <array>
 
-struct Vertex
+MeshBuilder::MeshData BoxBuilder::BuildBox(float Width, float Height, float Depth, uint32 NumSubdivisions)
 {
-	XMFLOAT3 Pos;
-	XMFLOAT4 Color;
-};
 
-bool BoxBuilder::BuildBox(std::unique_ptr<MeshGeometry>& BoxGeo, ComPtr<ID3D12Device> Device, ComPtr<ID3D12GraphicsCommandList> CommandList,
-    float Width, float Height, float Depth)
-{
-    float halfWidth = 0.5f * Width;
-    float halfHeight = 0.5f * Height;
-    float halfDepth = 0.5f * Depth;
+    //
+	// Create the vertices.
+	//
+	MeshBuilder::MeshData meshData;
 
-	std::array<Vertex, 8> vertices = {
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
-	};
+	Vertex v[24];
 
-    for(auto& v : vertices)
-    {
-        v.Pos.x *= halfWidth;
-        v.Pos.y *= halfHeight;
-        v.Pos.z *= halfDepth;
-    }
+	float w2 = 0.5f*Width;
+	float h2 = 0.5f*Height;
+	float d2 = 0.5f*Depth;
+    
+	// Fill in the front face vertex data.
+	v[0] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(-w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[2] = Vertex(+w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[3] = Vertex(+w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 
-	std::array<std::uint16_t, 36> indices = {
-		// front face
-		0, 1, 2,
-		0, 2, 3,
+	// Fill in the back face vertex data.
+	v[4] = Vertex(-w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[5] = Vertex(+w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[6] = Vertex(+w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[7] = Vertex(-w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
-		// back face
-		4, 6, 5,
-		4, 7, 6,
+	// Fill in the top face vertex data.
+	v[8]  = Vertex(-w2, +h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[9]  = Vertex(-w2, +h2, +d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[10] = Vertex(+w2, +h2, +d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[11] = Vertex(+w2, +h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 
-		// left face
-		4, 5, 1,
-		4, 1, 0,
+	// Fill in the bottom face vertex data.
+	v[12] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[13] = Vertex(+w2, -h2, -d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[14] = Vertex(+w2, -h2, +d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[15] = Vertex(-w2, -h2, +d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
-		// right face
-		3, 2, 6,
-		3, 6, 7,
+	// Fill in the left face vertex data.
+	v[16] = Vertex(-w2, -h2, +d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f);
+	v[17] = Vertex(-w2, +h2, +d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f);
+	v[18] = Vertex(-w2, +h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f);
+	v[19] = Vertex(-w2, -h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f);
 
-		// top face
-		1, 5, 6,
-		1, 6, 2,
+	// Fill in the right face vertex data.
+	v[20] = Vertex(+w2, -h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f);
+	v[21] = Vertex(+w2, +h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+	v[22] = Vertex(+w2, +h2, +d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f);
+	v[23] = Vertex(+w2, -h2, +d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
 
-		// bottom face
-		4, 0, 3,
-		4, 3, 7
-	};
+	meshData.Vertices.assign(&v[0], &v[24]);
+ 
+	//
+	// Create the indices.
+	//
 
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	uint32 i[36];
 
-	BoxGeo = std::make_unique<MeshGeometry>();
-	BoxGeo->Name = "boxGeo";
+	// Fill in the front face index data
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	i[3] = 0; i[4] = 2; i[5] = 3;
 
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, BoxGeo->VertexBufferCPU.GetAddressOf()));
-	CopyMemory(BoxGeo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	// Fill in the back face index data
+	i[6] = 4; i[7]  = 5; i[8]  = 6;
+	i[9] = 4; i[10] = 6; i[11] = 7;
 
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, BoxGeo->IndexBufferCPU.GetAddressOf()));
-	CopyMemory(BoxGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+	// Fill in the top face index data
+	i[12] = 8; i[13] =  9; i[14] = 10;
+	i[15] = 8; i[16] = 10; i[17] = 11;
 
-	BoxGeo->VertexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
-		vertices.data(), vbByteSize, BoxGeo->VertexBufferUploader);
+	// Fill in the bottom face index data
+	i[18] = 12; i[19] = 13; i[20] = 14;
+	i[21] = 12; i[22] = 14; i[23] = 15;
 
-	BoxGeo->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
-		indices.data(), ibByteSize, BoxGeo->IndexBufferUploader);
+	// Fill in the left face index data
+	i[24] = 16; i[25] = 17; i[26] = 18;
+	i[27] = 16; i[28] = 18; i[29] = 19;
 
-	BoxGeo->VertexByteStride = sizeof(Vertex);
-	BoxGeo->VertexBufferByteSize = vbByteSize;
-	BoxGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	BoxGeo->IndexBufferByteSize = ibByteSize;
+	// Fill in the right face index data
+	i[30] = 20; i[31] = 21; i[32] = 22;
+	i[33] = 20; i[34] = 22; i[35] = 23;
 
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
+	meshData.Indices32.assign(&i[0], &i[36]);
 
-	BoxGeo->DrawArgs["box"] = submesh;	
-	return true;
+    // Put a cap on the number of subdivisions.
+    uint32 numSubdivisions = std::min<uint32>(NumSubdivisions, 6u);
+
+    for(uint32 i = 0; i < numSubdivisions; ++i)
+	{
+        Subdivide(meshData);
+	}
+
+    return meshData;
 }

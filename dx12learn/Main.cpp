@@ -24,12 +24,6 @@ namespace DX
 
 }
 
-struct Vertex
-{
-	XMFLOAT3 Pos;
-	XMFLOAT4 Color;
-};
-
 struct ObjectConstans
 {
 	XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
@@ -308,7 +302,37 @@ void BoxApp::BuildShadersAndInputLayout()
 
 void BoxApp::BuildBoxGeometry()
 {
-	BoxBuilder::BuildBox(BoxGeo, Device, CommandList, 1.0f, 1.5f, 2.0f);
+	MeshBuilder::MeshData meshData = BoxBuilder().BuildBox(1.0f, 1.5f, 2.0f, 0);
+	std::vector<std::uint16_t> indices = meshData.GetIndices16();
+	const UINT vbByteSize = (UINT)meshData.Vertices.size() * sizeof(MeshBuilder::Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	BoxGeo = std::make_unique<MeshGeometry>();
+	BoxGeo->Name = "boxGeo";
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, BoxGeo->VertexBufferCPU.GetAddressOf()));
+	CopyMemory(BoxGeo->VertexBufferCPU->GetBufferPointer(), meshData.Vertices.data(), vbByteSize);
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, BoxGeo->IndexBufferCPU.GetAddressOf()));
+	CopyMemory(BoxGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	BoxGeo->VertexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
+		meshData.Vertices.data(), vbByteSize, BoxGeo->VertexBufferUploader);
+
+	BoxGeo->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
+		indices.data(), ibByteSize, BoxGeo->IndexBufferUploader);
+
+	BoxGeo->VertexByteStride = sizeof(MeshBuilder::Vertex);
+	BoxGeo->VertexBufferByteSize = vbByteSize;
+	BoxGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	BoxGeo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indices.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	BoxGeo->DrawArgs["box"] = submesh;	
 }
 
 void BoxApp::BuildPSO()
