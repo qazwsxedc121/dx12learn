@@ -42,10 +42,24 @@ public:
 	BoxApp(const BoxApp& rhs) = delete;
 	BoxApp& operator=(const BoxApp& rhs) = delete;
 	~BoxApp() = default;
+	virtual void Init() override;
+
+protected:
 
 	virtual void Render() override;
-	virtual void Init() override;
-	
+	virtual void OnResize() override;	
+	virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
+	virtual void OnMouseDown(WPARAM btnState, int x, int y) override
+	{
+		LastMousePos.x = x;
+		LastMousePos.y = y;
+
+		SetCapture(mHWnd);
+	}
+	virtual void OnMouseUp(WPARAM btnState, int x, int y) override
+	{
+		ReleaseCapture();
+	}
 
 protected:
 	ComPtr<ID3D12RootSignature> RootSignature;
@@ -214,6 +228,39 @@ void BoxApp::Init()
 	OutputDebugStringA("Init Done\n");
 }
 
+void BoxApp::OnResize()
+{
+	D3D12App::OnResize();
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
+	XMStoreFloat4x4(&Proj, proj);
+}
+
+void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
+{
+	if((btnState & MK_LBUTTON) != 0)
+	{
+		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - LastMousePos.x));
+		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - LastMousePos.y));
+
+		Theta += dx;
+		Phi += dy;
+
+		Phi = MathHelper::Clamp(Phi, 0.1f, XM_PI - 0.1f);
+	}
+	else if((btnState & MK_RBUTTON) != 0)
+	{
+		float dx = 0.05f * static_cast<float>(x - LastMousePos.x);
+		float dy = 0.05f * static_cast<float>(y - LastMousePos.y);
+
+		Radius += dx - dy;
+
+		Radius = MathHelper::Clamp(Radius, 3.0f, 15.0f);
+	}
+
+	LastMousePos.x = x;
+	LastMousePos.y = y;
+}
+
 void BoxApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE cbvTable;
@@ -259,16 +306,15 @@ void BoxApp::BuildShadersAndInputLayout()
 
 void BoxApp::BuildBoxGeometry()
 {
-	float Color[4] = { 0.1f, 1.0f, 0.5f, 1.0f };
 	std::array<Vertex, 8> vertices = {
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Color) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Color) })
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
 	};
 
 	std::array<std::uint16_t, 36> indices = {

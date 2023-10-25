@@ -123,7 +123,27 @@ LRESULT D3D12App::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
         }
         case WM_PAINT:
         {
+            Update();
             Render();
+            return 0;
+        }
+        case WM_LBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_RBUTTONDOWN:
+        {
+            OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return 0;
+        }
+        case WM_LBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_RBUTTONUP:
+        {
+            OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return 0;
+        }
+        case WM_MOUSEMOVE:
+        {
+            OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
         }
         case WM_SIZE:
@@ -368,13 +388,14 @@ void D3D12App::Main()
 
 }
 
-void D3D12App::Render()
-{
-}
-
 D3D12App *D3D12App::Get()
 {
     return AppInstance;
+}
+
+float D3D12App::AspectRatio() const
+{
+    return static_cast<float>(ClientWidth) / ClientHeight;
 }
 
 void D3D12App::InitSwapChain()

@@ -11,9 +11,18 @@ public:
 	virtual void Init();
     void Main();
 
-	virtual void Render();
 	static D3D12App* Get();
+
+	float AspectRatio()const;
+
 protected:
+	virtual void OnResize();
+	virtual void Update() {};
+	virtual void Render() {};
+
+	virtual void OnMouseDown(WPARAM btnState, int x, int y) { }
+	virtual void OnMouseUp(WPARAM btnState, int x, int y) { }
+	virtual void OnMouseMove(WPARAM btnState, int x, int y) { }
 
 	static D3D12App* AppInstance;
 
@@ -48,7 +57,6 @@ protected:
 	void InitSwapChain();
     void InitCommandQueue();
 	void InitDescriptorHeap();
-	void OnResize();
 	void FlushCommandQueue();
 
 	ID3D12Resource* CurrentBackBuffer()const;
