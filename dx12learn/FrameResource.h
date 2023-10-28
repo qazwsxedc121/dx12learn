@@ -5,7 +5,7 @@
 
 struct ObjectConstants
 {
-    DirectX::XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+    DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
 };
 
 struct PassConstants
