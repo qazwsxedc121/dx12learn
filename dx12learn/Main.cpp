@@ -56,7 +56,8 @@ public:
 	const static int NumFrameResources = 3;
 protected:
 
-	virtual void Render() override;
+	virtual void Update(const GameTimer& gt) override;
+	virtual void Render(const GameTimer& gt) override;
 	virtual void OnResize() override;	
 	virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override
@@ -154,40 +155,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	return 0;
 }
 
-void BoxApp::Render()
+void BoxApp::Render(const GameTimer& gt)
 {
 
-	if (Device == nullptr)
-	{
-		return;
-	}
-	float x = Radius * sinf(Phi) * cosf(Theta);
-	float z = Radius * sinf(Phi) * sinf(Theta);
-	float y = Radius * cosf(Phi);
-
-	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
-	XMVECTOR target = XMVectorZero();
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-	XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&View, view);
-
-	XMMATRIX proj = XMLoadFloat4x4(&Proj);
-
-	CurrentFrameResourceIndex = (CurrentFrameResourceIndex + 1) % NumFrameResources;
-	CurrentFrameResource = FrameResources[CurrentFrameResourceIndex].get();
-
-	// wait until the gpu has completed commands up to this fence point
-	if(CurrentFrameResource->Fence != 0 && Fence->GetCompletedValue() < CurrentFrameResource->Fence)
-	{
-		HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
-		ThrowIfFailed(Fence->SetEventOnCompletion(CurrentFrameResource->Fence, eventHandle));
-		WaitForSingleObject(eventHandle, INFINITE);
-		CloseHandle(eventHandle);
-	}
-
-	UpdateMainPassCB();
-	UpdateObjectCBs();
 
 	ThrowIfFailed(CommandAllocator->Reset());
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), PipelineState.Get()));
@@ -603,7 +573,7 @@ void BoxApp::BuildConstantBuffers()
 
 void BoxApp::UpdateObjectCBs()
 {
-	for(auto& ritem : OpaqueRitems)
+	for(auto& ritem : AllRitems)
 	{
 		if(ritem->NumFramesDirty > 0)
 		{
@@ -616,4 +586,44 @@ void BoxApp::UpdateObjectCBs()
 			ritem->NumFramesDirty--;
 		}
 	}
+}
+
+void BoxApp::Update(const GameTimer& gt)
+{
+	float x = Radius * sinf(Phi) * cosf(Theta);
+	float z = Radius * sinf(Phi) * sinf(Theta);
+	float y = Radius * cosf(Phi);
+
+	{
+		float deltaTime = gt.GetDeltaTime();
+		auto boxRitem = AllRitems[0].get();
+		float boxX = 2.0f * sinf(gt.GetTotalTime());
+		float boxZ = 2.0f * cosf(gt.GetTotalTime());
+		XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(boxX, 1.0f, boxZ));
+		boxRitem->NumFramesDirty = NumFrameResources;
+	}
+
+	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
+	XMVECTOR target = XMVectorZero();
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
+	XMStoreFloat4x4(&View, view);
+
+	XMMATRIX proj = XMLoadFloat4x4(&Proj);
+
+	CurrentFrameResourceIndex = (CurrentFrameResourceIndex + 1) % NumFrameResources;
+	CurrentFrameResource = FrameResources[CurrentFrameResourceIndex].get();
+
+	// wait until the gpu has completed commands up to this fence point
+	if (CurrentFrameResource->Fence != 0 && Fence->GetCompletedValue() < CurrentFrameResource->Fence)
+	{
+		HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
+		ThrowIfFailed(Fence->SetEventOnCompletion(CurrentFrameResource->Fence, eventHandle));
+		WaitForSingleObject(eventHandle, INFINITE);
+		CloseHandle(eventHandle);
+	}
+
+	UpdateMainPassCB();
+	UpdateObjectCBs();
 }

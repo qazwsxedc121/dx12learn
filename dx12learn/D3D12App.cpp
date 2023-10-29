@@ -107,6 +107,20 @@ LRESULT D3D12App::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 {
     switch(message)
     {
+        case WM_ACTIVATE:
+        {
+            if(LOWORD(wParam) == WA_INACTIVE)
+            {
+                Paused = true;
+                Timer.Stop();
+            }
+            else
+            {
+                Paused = false;
+                Timer.Start();
+            }
+            return 0;
+        }
         case WM_CREATE:
         {
             LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
@@ -119,12 +133,6 @@ LRESULT D3D12App::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
             {
                 PostQuitMessage(0);
             }
-            return 0;
-        }
-        case WM_PAINT:
-        {
-            Update();
-            Render();
             return 0;
         }
         case WM_LBUTTONDOWN:
@@ -371,6 +379,8 @@ void D3D12App::FlushCommandQueue()
 void D3D12App::Main()
 {
     //InitSwapChain();
+
+    Timer.Reset();
     MSG msg = {};
     while(msg.message != WM_QUIT)
     {
@@ -378,11 +388,23 @@ void D3D12App::Main()
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-
         }
         else
         {
-            Render();
+            Timer.Tick();
+            Update(Timer);
+            Render(Timer);
+            /*
+            if(!Paused)
+            {
+                Update(Timer);
+                Render(Timer);
+            }
+            else
+            {
+                Sleep(100);
+            }
+            */
         }
     }
 

@@ -42,6 +42,15 @@
     <ClCompile Include="MeshBuilder\MeshBoxBuilder.cpp">
       <Filter>源文件\MeshBuilder</Filter>
     </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshBuilder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshSphereBuilder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GameTimer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -64,6 +73,15 @@
     </ClInclude>
     <ClInclude Include="MeshBuilder\MeshBoxBuilder.h">
       <Filter>头文件\MeshBuilder</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshBuilder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshSphereBuilder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GameTimer.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
