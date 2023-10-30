@@ -51,6 +51,9 @@
     <ClCompile Include="GameTimer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshCylinderBuilder.cpp">
+      <Filter>源文件\MeshBuilder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -82,6 +85,12 @@
     </ClInclude>
     <ClInclude Include="GameTimer.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshCylinderBuilder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshCylinderBuilder.h">
+      <Filter>头文件\MeshBuilder</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

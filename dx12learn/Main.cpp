@@ -9,6 +9,7 @@
 
 #include "MeshBuilder/MeshBoxBuilder.h"
 #include "MeshBuilder/MeshSphereBuilder.h"
+#include "MeshBuilder/MeshCylinderBuilder.h"
 #include "FrameResource.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -28,7 +29,7 @@ namespace DX
 
 
 
-class BoxApp : public D3D12App
+class DemoApp : public D3D12App
 {
 public:
 	struct RenderItem
@@ -36,7 +37,7 @@ public:
 		RenderItem() = default;
 
 		XMFLOAT4X4 World = MathHelper::Identity4x4();
-		int NumFramesDirty = BoxApp::NumFrameResources;
+		int NumFramesDirty = DemoApp::NumFrameResources;
 		UINT ObjCBIndex = -1;
 		MeshGeometry* Geo = nullptr;
 		D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -45,12 +46,12 @@ public:
 		int BaseVertexLocation = 0;
 	};
 
-	BoxApp(HINSTANCE hInstance) : D3D12App(hInstance)
+	DemoApp(HINSTANCE hInstance) : D3D12App(hInstance)
 	{
 	}
-	BoxApp(const BoxApp& rhs) = delete;
-	BoxApp& operator=(const BoxApp& rhs) = delete;
-	~BoxApp() = default;
+	DemoApp(const DemoApp& rhs) = delete;
+	DemoApp& operator=(const DemoApp& rhs) = delete;
+	~DemoApp() = default;
 	virtual void Init() override;
 
 	const static int NumFrameResources = 3;
@@ -80,7 +81,7 @@ protected:
 	FrameResource* CurrentFrameResource = nullptr;
 	int CurrentFrameResourceIndex = 0;
 
-	std::unique_ptr<MeshGeometry> BoxGeo = nullptr;
+	std::unique_ptr<MeshGeometry> Geometry = nullptr;
 
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
@@ -105,6 +106,7 @@ protected:
 
 	POINT LastMousePos;
 
+	vector<MeshBuilder::MeshData> MeshDataList;
 
 	void BuildDescriptorHeaps();
 	void BuildFrameResources();
@@ -148,14 +150,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	OutputDebugStringA("WinMain Start\n");
 	
 	
-	BoxApp app(hInstance);
+	DemoApp app(hInstance);
 	app.Init();
 	app.Main();
 	
 	return 0;
 }
 
-void BoxApp::Render(const GameTimer& gt)
+void DemoApp::Render(const GameTimer& gt)
 {
 
 
@@ -205,7 +207,7 @@ void BoxApp::Render(const GameTimer& gt)
 
 }
 
-void BoxApp::Init()
+void DemoApp::Init()
 {
 	OutputDebugStringA("Init Start\n");
 	D3D12App::Init();
@@ -233,14 +235,14 @@ void BoxApp::Init()
 	OutputDebugStringA("Init Done\n");
 }
 
-void BoxApp::OnResize()
+void DemoApp::OnResize()
 {
 	D3D12App::OnResize();
 	XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
 	XMStoreFloat4x4(&Proj, proj);
 }
 
-void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
+void DemoApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
 	if((btnState & MK_LBUTTON) != 0)
 	{
@@ -266,7 +268,7 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
 	LastMousePos.y = y;
 }
 
-void BoxApp::BuildRootSignature()
+void DemoApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE cbvTable0;
 	cbvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -299,7 +301,7 @@ void BoxApp::BuildRootSignature()
 
 }
 
-void BoxApp::BuildShadersAndInputLayout()
+void DemoApp::BuildShadersAndInputLayout()
 {
 	HRESULT hr = S_OK;
 	VertexShader = D3DUtil::CompileShader(L"Shaders/VertexShader.hlsl", nullptr, "VS", "vs_5_0");
@@ -313,7 +315,7 @@ void BoxApp::BuildShadersAndInputLayout()
 	};
 }
 
-void BoxApp::BuildBoxGeometry()
+void DemoApp::BuildBoxGeometry()
 {
 	struct Vertex
 	{
@@ -323,73 +325,78 @@ void BoxApp::BuildBoxGeometry()
 
 	MeshBuilder::MeshData boxData = BoxBuilder().BuildBox(1.0f, 1.5f, 2.0f, 0);
 	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.7f, 20, 20);
+	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 
-	UINT boxVertexOffset = 0;
-	UINT sphereVertexOffset = (UINT)boxData.Vertices.size();
+	MeshDataList.push_back(boxData);
+	MeshDataList.push_back(sphereData);
+	MeshDataList.push_back(cylinderData);
 
-	UINT boxIndexOffset = 0;
-	UINT sphereIndexOffset = (UINT)boxData.Indices32.size();
-
-	SubmeshGeometry boxSubmesh;
-	boxSubmesh.IndexCount = (UINT)boxData.Indices32.size();
-	boxSubmesh.StartIndexLocation = boxIndexOffset;
-	boxSubmesh.BaseVertexLocation = boxVertexOffset;
-
-	SubmeshGeometry sphereSubmesh;
-	sphereSubmesh.IndexCount = (UINT)sphereData.Indices32.size();
-	sphereSubmesh.StartIndexLocation = sphereIndexOffset;
-	sphereSubmesh.BaseVertexLocation = sphereVertexOffset;
-
-	UINT totalVertexCount = boxData.Vertices.size() + sphereData.Vertices.size();
-
-	std::vector<Vertex> vertices(totalVertexCount);
-
-	UINT k = 0;
-	for (size_t i = 0; i < boxData.Vertices.size(); ++i, ++k)
+	vector<SubmeshGeometry> submeshGeometries;
+	UINT vertexOffset = 0;
+	UINT indexOffset = 0;
+	UINT totalVertexCount = 0;
+	for (MeshBuilder::MeshData& data : MeshDataList)
 	{
-		vertices[k].Pos = boxData.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::DarkGreen);
+		SubmeshGeometry submesh;
+		submesh.IndexCount = (UINT)data.Indices32.size();
+		submesh.StartIndexLocation = indexOffset;
+		submesh.BaseVertexLocation = vertexOffset;
+		submeshGeometries.push_back(submesh);
+
+		vertexOffset += (UINT)data.Vertices.size();
+		indexOffset += (UINT)data.Indices32.size();
+		totalVertexCount += (UINT)data.Vertices.size();
 	}
 
-	for (size_t i = 0; i < sphereData.Vertices.size(); ++i, ++k)
+	std::vector<Vertex> vertices(totalVertexCount);
+	std::vector<XMVECTORF32> colors = { Colors::Red, Colors::Green, Colors::Blue, Colors::Yellow, Colors::Orange, Colors::Purple, Colors::White, Colors::Black };
+	UINT k = 0;
+	for(size_t i = 0; i < MeshDataList.size(); ++i)
 	{
-		vertices[k].Pos = sphereData.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::DarkRed);
+		for(size_t j = 0; j < MeshDataList[i].Vertices.size(); ++j, ++k)
+		{
+			vertices[k].Pos = MeshDataList[i].Vertices[j].Position;
+			vertices[k].Color = XMFLOAT4(colors[i % colors.size()]);
+		}
 	}
 
 	std::vector<std::uint16_t> indices;
-	indices.insert(indices.end(), std::begin(boxData.GetIndices16()), std::end(boxData.GetIndices16()));
-	indices.insert(indices.end(), std::begin(sphereData.GetIndices16()), std::end(sphereData.GetIndices16()));
+	for(size_t i = 0; i < MeshDataList.size(); ++i)
+	{
+		indices.insert(indices.end(), std::begin(MeshDataList[i].GetIndices16()), std::end(MeshDataList[i].GetIndices16()));
+	}
+
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
-	BoxGeo = std::make_unique<MeshGeometry>();
-	BoxGeo->Name = "shapeGeo";
+	Geometry = std::make_unique<MeshGeometry>();
+	Geometry->Name = "shapeGeo";
 
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, BoxGeo->VertexBufferCPU.GetAddressOf()));
-	CopyMemory(BoxGeo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, Geometry->VertexBufferCPU.GetAddressOf()));
+	CopyMemory(Geometry->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
 
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, BoxGeo->IndexBufferCPU.GetAddressOf()));
-	CopyMemory(BoxGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, Geometry->IndexBufferCPU.GetAddressOf()));
+	CopyMemory(Geometry->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
-	BoxGeo->VertexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
-		vertices.data(), vbByteSize, BoxGeo->VertexBufferUploader);
+	Geometry->VertexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
+		vertices.data(), vbByteSize, Geometry->VertexBufferUploader);
 
-	BoxGeo->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
-		indices.data(), ibByteSize, BoxGeo->IndexBufferUploader);
+	Geometry->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(),
+		indices.data(), ibByteSize, Geometry->IndexBufferUploader);
 
-	BoxGeo->VertexByteStride = sizeof(Vertex);
-	BoxGeo->VertexBufferByteSize = vbByteSize;
-	BoxGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	BoxGeo->IndexBufferByteSize = ibByteSize;
+	Geometry->VertexByteStride = sizeof(Vertex);
+	Geometry->VertexBufferByteSize = vbByteSize;
+	Geometry->IndexFormat = DXGI_FORMAT_R16_UINT;
+	Geometry->IndexBufferByteSize = ibByteSize;
 
-	BoxGeo->DrawArgs["box"] = boxSubmesh;	
-	BoxGeo->DrawArgs["sphere"] = sphereSubmesh;
-
+	for(size_t i = 0; i < submeshGeometries.size(); ++i)
+	{
+		Geometry->DrawArgs["shape_" + std::to_string(i)] = submeshGeometries[i];
+	}
 }
 
-void BoxApp::BuildPSO()
+void DemoApp::BuildPSO()
 {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
 	ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
@@ -419,27 +426,21 @@ void BoxApp::BuildPSO()
 
 }
 
-void BoxApp::BuildRenderItems()
+void DemoApp::BuildRenderItems()
 {
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(0.0f, 1.0f, 0.0f));
-	boxRitem->ObjCBIndex = 0;
-	boxRitem->Geo = BoxGeo.get();
-	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-	AllRitems.push_back(std::move(boxRitem));
 
-	auto sphereRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&sphereRitem->World, XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-	sphereRitem->ObjCBIndex = 1;
-	sphereRitem->Geo = BoxGeo.get();
-	sphereRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	sphereRitem->IndexCount = sphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-	sphereRitem->StartIndexLocation = sphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-	sphereRitem->BaseVertexLocation = sphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-	AllRitems.push_back(std::move(sphereRitem));
+	for(size_t i = 0; i < MeshDataList.size(); ++i)
+	{
+		auto ritem = std::make_unique<RenderItem>();
+		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(0.0f, (float)i * 3, 0.0f));
+		ritem->ObjCBIndex = i;
+		ritem->Geo = Geometry.get();
+		ritem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		ritem->IndexCount = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].IndexCount;
+		ritem->StartIndexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].StartIndexLocation;
+		ritem->BaseVertexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].BaseVertexLocation;
+		AllRitems.push_back(std::move(ritem));
+	}
 
 	for(auto& e : AllRitems)
 	{
@@ -447,7 +448,7 @@ void BoxApp::BuildRenderItems()
 	}
 }
 
-void BoxApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vector<RenderItem *> &ritems)
+void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vector<RenderItem *> &ritems)
 {
 	UINT objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
@@ -471,7 +472,7 @@ void BoxApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vect
 
 }
 
-void BoxApp::UpdateMainPassCB()
+void DemoApp::UpdateMainPassCB()
 {
 	XMMATRIX view = XMLoadFloat4x4(&View);
 	XMMATRIX proj = XMLoadFloat4x4(&Proj);
@@ -503,7 +504,7 @@ void BoxApp::UpdateMainPassCB()
 	CurrentFrameResource->PassCB->CopyData(0, MainPassCB);
 }
 
-void BoxApp::BuildDescriptorHeaps()
+void DemoApp::BuildDescriptorHeaps()
 {
 	UINT objCount = (UINT)AllRitems.size();
 
@@ -520,7 +521,7 @@ void BoxApp::BuildDescriptorHeaps()
 	ThrowIfFailed(Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(CbvHeap.GetAddressOf())));
 }
 
-void BoxApp::BuildFrameResources()
+void DemoApp::BuildFrameResources()
 {
 	for(int i = 0; i < NumFrameResources; ++i)
 	{
@@ -528,7 +529,7 @@ void BoxApp::BuildFrameResources()
 	}
 }
 
-void BoxApp::BuildConstantBuffers()
+void DemoApp::BuildConstantBuffers()
 {
 	UINT objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
@@ -571,7 +572,7 @@ void BoxApp::BuildConstantBuffers()
 	}
 }
 
-void BoxApp::UpdateObjectCBs()
+void DemoApp::UpdateObjectCBs()
 {
 	for(auto& ritem : AllRitems)
 	{
@@ -588,7 +589,7 @@ void BoxApp::UpdateObjectCBs()
 	}
 }
 
-void BoxApp::Update(const GameTimer& gt)
+void DemoApp::Update(const GameTimer& gt)
 {
 	float x = Radius * sinf(Phi) * cosf(Theta);
 	float z = Radius * sinf(Phi) * sinf(Theta);
