@@ -10,6 +10,7 @@
 #include "MeshBuilder/MeshBoxBuilder.h"
 #include "MeshBuilder/MeshSphereBuilder.h"
 #include "MeshBuilder/MeshCylinderBuilder.h"
+#include "MeshBuilder/MeshGridBuilder.h"
 #include "FrameResource.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -44,6 +45,20 @@ public:
 		UINT IndexCount = 0;
 		UINT StartIndexLocation = 0;
 		int BaseVertexLocation = 0;
+	};
+
+	struct RenderItemWorldInfo
+	{
+		uint16_t ObjIndex = -1;
+		XMFLOAT3 WorldPos = { 0.0f, 0.0f, 0.0f };
+		XMFLOAT3 Scale = { 1.0f, 1.0f, 1.0f };
+		XMFLOAT3 Euler = { 0.0f, 0.0f, 0.0f };
+
+		RenderItemWorldInfo(uint16_t objIndex, XMFLOAT3 worldPos) :
+			ObjIndex(objIndex), WorldPos(worldPos)
+		{
+
+		}
 	};
 
 	DemoApp(HINSTANCE hInstance) : D3D12App(hInstance)
@@ -171,8 +186,7 @@ void DemoApp::Render(const GameTimer& gt)
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
 
-	float clearColor[] = { 0.3f, 0.2f, 0.1f, 1.0f };
-	CommandList->ClearRenderTargetView(CurrentBackBufferView(), clearColor, 0, nullptr);
+	CommandList->ClearRenderTargetView(CurrentBackBufferView(), DirectX::Colors::Black, 0, nullptr);
 
 	CommandList->ClearDepthStencilView(DepthStencilView(),
 		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
@@ -323,13 +337,15 @@ void DemoApp::BuildBoxGeometry()
 		XMFLOAT4 Color;
 	};
 
-	MeshBuilder::MeshData boxData = BoxBuilder().BuildBox(1.0f, 1.5f, 2.0f, 0);
-	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.7f, 20, 20);
+	MeshBuilder::MeshData boxData = BoxBuilder().BuildBox(1.0f, 1.5f, 1.5f, 3);
+	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.5f, 20, 20);
 	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
+	MeshBuilder::MeshData gridData = GridBuilder().BuildGrid(20.0f, 30.0f, 60, 40);
 
 	MeshDataList.push_back(boxData);
 	MeshDataList.push_back(sphereData);
 	MeshDataList.push_back(cylinderData);
+	MeshDataList.push_back(gridData);
 
 	vector<SubmeshGeometry> submeshGeometries;
 	UINT vertexOffset = 0;
@@ -428,17 +444,30 @@ void DemoApp::BuildPSO()
 
 void DemoApp::BuildRenderItems()
 {
+	vector<RenderItemWorldInfo> renderItemWorldInfos = {
+		RenderItemWorldInfo(0, XMFLOAT3(0.0f, 0.5f, 0.0f)),
+		RenderItemWorldInfo(3, XMFLOAT3(0.0f, 0.0f, 0.0f)),
+	};
+	for(int i = 0; i < 5; ++i)
+	{
+		renderItemWorldInfos.push_back(RenderItemWorldInfo(2, XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo(2, XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f)));
 
-	for(size_t i = 0; i < MeshDataList.size(); ++i)
+		renderItemWorldInfos.push_back(RenderItemWorldInfo(1, XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo(1, XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f)));
+	}
+
+	for(size_t i = 0; i < renderItemWorldInfos.size(); ++i)
 	{
 		auto ritem = std::make_unique<RenderItem>();
-		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(0.0f, (float)i * 3, 0.0f));
+		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(renderItemWorldInfos[i].WorldPos.x, renderItemWorldInfos[i].WorldPos.y, renderItemWorldInfos[i].WorldPos.z));
+		uint16_t objIndex = renderItemWorldInfos[i].ObjIndex;
 		ritem->ObjCBIndex = i;
 		ritem->Geo = Geometry.get();
 		ritem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		ritem->IndexCount = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].IndexCount;
-		ritem->StartIndexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].StartIndexLocation;
-		ritem->BaseVertexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(i)].BaseVertexLocation;
+		ritem->IndexCount = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].IndexCount;
+		ritem->StartIndexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].StartIndexLocation;
+		ritem->BaseVertexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].BaseVertexLocation;
 		AllRitems.push_back(std::move(ritem));
 	}
 

@@ -54,6 +54,9 @@
     <ClCompile Include="MeshBuilder\MeshCylinderBuilder.cpp">
       <Filter>源文件\MeshBuilder</Filter>
     </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshGridBuilder.cpp">
+      <Filter>源文件\MeshBuilder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -90,6 +93,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="MeshBuilder\MeshCylinderBuilder.h">
+      <Filter>头文件\MeshBuilder</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshGridBuilder.h">
       <Filter>头文件\MeshBuilder</Filter>
     </ClInclude>
   </ItemGroup>

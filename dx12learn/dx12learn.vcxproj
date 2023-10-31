@@ -142,6 +142,7 @@
     <ClCompile Include="MeshBuilder\MeshBoxBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshCylinderBuilder.cpp" />
+    <ClCompile Include="MeshBuilder\MeshGridBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshSphereBuilder.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -158,6 +159,7 @@
     <ClInclude Include="MeshBuilder\MeshBoxBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshCylinderBuilder.h" />
+    <ClInclude Include="MeshBuilder\MeshGridBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshSphereBuilder.h" />
     <ClInclude Include="MeshCylinderBuilder.h" />
     <ClInclude Include="stdafx.h" />
