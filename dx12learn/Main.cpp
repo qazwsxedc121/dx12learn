@@ -87,6 +87,10 @@ protected:
 	{
 		ReleaseCapture();
 	}
+	float GetHillsHeight(float x, float z) const
+	{
+		return 0.3f * (z * sinf(0.1f*x) + x * cosf(0.1f * z));
+	}
 
 protected:
 	ComPtr<ID3D12RootSignature> RootSignature;
@@ -96,7 +100,7 @@ protected:
 	FrameResource* CurrentFrameResource = nullptr;
 	int CurrentFrameResourceIndex = 0;
 
-	std::unique_ptr<MeshGeometry> Geometry = nullptr;
+	vector<std::unique_ptr<MeshGeometry>> Geometries;
 
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
@@ -129,6 +133,7 @@ protected:
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildBoxGeometry();
+	void BuildLandGeometry();
 	void BuildPSO();
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
@@ -229,6 +234,7 @@ void DemoApp::Init()
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 
 	BuildBoxGeometry();
+	BuildLandGeometry();
 	BuildRenderItems();
 
 	BuildDescriptorHeaps();
@@ -386,7 +392,7 @@ void DemoApp::BuildBoxGeometry()
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
-	Geometry = std::make_unique<MeshGeometry>();
+	std::unique_ptr<MeshGeometry> Geometry = std::make_unique<MeshGeometry>();
 	Geometry->Name = "shapeGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, Geometry->VertexBufferCPU.GetAddressOf()));
@@ -410,6 +416,73 @@ void DemoApp::BuildBoxGeometry()
 	{
 		Geometry->DrawArgs["shape_" + std::to_string(i)] = submeshGeometries[i];
 	}
+
+	Geometries.push_back(std::move(Geometry));
+}
+
+void DemoApp::BuildLandGeometry()
+{
+	MeshBuilder::MeshData grid = GridBuilder().BuildGrid(160.0f, 160.0f, 60, 60);
+
+	std::vector<Vertex> vertices(grid.Vertices.size());
+	for(size_t i = 0; i < grid.Vertices.size(); ++i)
+	{
+		auto& p = grid.Vertices[i].Position;
+		vertices[i].Pos = p;
+		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
+
+		if(vertices[i].Pos.y < -10.0f)
+		{
+			vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
+		}
+		else if(vertices[i].Pos.y < 5.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
+		}
+		else if(vertices[i].Pos.y < 12.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
+		}
+		else if(vertices[i].Pos.y < 20.0f)
+		{
+			vertices[i].Color = XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
+		}
+		else
+		{
+			vertices[i].Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+	}
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	std::vector<std::uint16_t> indices = grid.GetIndices16();
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	std::unique_ptr<MeshGeometry> geo = std::make_unique<MeshGeometry>();
+	geo->Name = "landGeo";
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, geo->VertexBufferCPU.GetAddressOf()));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, geo->IndexBufferCPU.GetAddressOf()));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indices.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["grid"] = submesh;
+
+	Geometries.push_back(std::move(geo));
+
 }
 
 void DemoApp::BuildPSO()
@@ -463,13 +536,24 @@ void DemoApp::BuildRenderItems()
 		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(renderItemWorldInfos[i].WorldPos.x, renderItemWorldInfos[i].WorldPos.y, renderItemWorldInfos[i].WorldPos.z));
 		uint16_t objIndex = renderItemWorldInfos[i].ObjIndex;
 		ritem->ObjCBIndex = i;
-		ritem->Geo = Geometry.get();
+		ritem->Geo = Geometries[0].get();
 		ritem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		ritem->IndexCount = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].IndexCount;
 		ritem->StartIndexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].StartIndexLocation;
 		ritem->BaseVertexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].BaseVertexLocation;
 		AllRitems.push_back(std::move(ritem));
 	}
+
+	auto gridRitem = std::make_unique<RenderItem>();
+	gridRitem->World = MathHelper::Identity4x4();
+	gridRitem->ObjCBIndex = renderItemWorldInfos.size();
+	gridRitem->Geo = Geometries[1].get();
+	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	gridRitem->IndexCount = Geometries[1]->DrawArgs["grid"].IndexCount;
+	gridRitem->StartIndexLocation = Geometries[1]->DrawArgs["grid"].StartIndexLocation;
+	gridRitem->BaseVertexLocation = Geometries[1]->DrawArgs["grid"].BaseVertexLocation;
+	AllRitems.push_back(std::move(gridRitem));
+
 
 	for(auto& e : AllRitems)
 	{
