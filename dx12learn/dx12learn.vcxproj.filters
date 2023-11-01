@@ -19,6 +19,12 @@
     <Filter Include="源文件\MeshBuilder">
       <UniqueIdentifier>{b5d06459-8df8-4feb-9ca9-babf67fffb4b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\Simulation">
+      <UniqueIdentifier>{00b90ea4-1992-4545-a11c-4e49e245d563}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Simulation">
+      <UniqueIdentifier>{cf16dbd3-8ec9-4b0f-a303-a19cac17cc1b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -56,6 +62,9 @@
     </ClCompile>
     <ClCompile Include="MeshBuilder\MeshGridBuilder.cpp">
       <Filter>源文件\MeshBuilder</Filter>
+    </ClCompile>
+    <ClCompile Include="Simulation\Waves.cpp">
+      <Filter>源文件\Simulation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -97,6 +106,9 @@
     </ClInclude>
     <ClInclude Include="MeshBuilder\MeshGridBuilder.h">
       <Filter>头文件\MeshBuilder</Filter>
+    </ClInclude>
+    <ClInclude Include="Simulation\Waves.h">
+      <Filter>头文件\Simulation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

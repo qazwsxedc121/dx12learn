@@ -11,6 +11,7 @@
 #include "MeshBuilder/MeshSphereBuilder.h"
 #include "MeshBuilder/MeshCylinderBuilder.h"
 #include "MeshBuilder/MeshGridBuilder.h"
+#include "Simulation/Waves.h"
 #include "FrameResource.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -110,6 +111,8 @@ protected:
 	std::vector<std::unique_ptr<RenderItem>> AllRitems;
 	std::vector<RenderItem*> OpaqueRitems;
 
+	RenderItem* WaveRitem;
+
 	PassConstants MainPassCB;
 
 	UINT PassCbvOffset = 0;
@@ -134,13 +137,17 @@ protected:
 	void BuildShadersAndInputLayout();
 	void BuildBoxGeometry();
 	void BuildLandGeometry();
+	void BuildWaveGeometry();
 	void BuildPSO();
 	void BuildRenderItems();
-	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
+	void UpdateWave(const GameTimer& gt);
+	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 	void UpdateMainPassCB();
 	void UpdateObjectCBs();
 
+
+	std::unique_ptr<Waves> Wave;
 };
 
 
@@ -235,6 +242,7 @@ void DemoApp::Init()
 
 	BuildBoxGeometry();
 	BuildLandGeometry();
+	BuildWaveGeometry();
 	BuildRenderItems();
 
 	BuildDescriptorHeaps();
@@ -554,6 +562,17 @@ void DemoApp::BuildRenderItems()
 	gridRitem->BaseVertexLocation = Geometries[1]->DrawArgs["grid"].BaseVertexLocation;
 	AllRitems.push_back(std::move(gridRitem));
 
+	auto wavesRitem = std::make_unique<RenderItem>();
+	wavesRitem->World = MathHelper::Identity4x4();
+	wavesRitem->ObjCBIndex = renderItemWorldInfos.size() + 1;
+	wavesRitem->Geo = Geometries[2].get();
+	wavesRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	wavesRitem->IndexCount = Geometries[2]->DrawArgs["water"].IndexCount;
+	wavesRitem->StartIndexLocation = Geometries[2]->DrawArgs["water"].StartIndexLocation;
+	wavesRitem->BaseVertexLocation = Geometries[2]->DrawArgs["water"].BaseVertexLocation;
+	WaveRitem = wavesRitem.get();
+	AllRitems.push_back(std::move(wavesRitem));
+
 
 	for(auto& e : AllRitems)
 	{
@@ -638,7 +657,7 @@ void DemoApp::BuildFrameResources()
 {
 	for(int i = 0; i < NumFrameResources; ++i)
 	{
-		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), 1));
+		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), 1, 128*128));
 	}
 }
 
@@ -738,6 +757,92 @@ void DemoApp::Update(const GameTimer& gt)
 		CloseHandle(eventHandle);
 	}
 
+	UpdateWave(gt);
+
 	UpdateMainPassCB();
 	UpdateObjectCBs();
+}
+
+void DemoApp::BuildWaveGeometry()
+{
+	Wave = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+	std::vector<std::uint16_t> indices(3 * Wave->GetTriangleCount());
+
+	int m = Wave->GetRowCount();
+	int n = Wave->GetColumnCount();
+	int k = 0;
+
+	for(int i = 0; i < m - 1; ++i)
+	{
+		for(int j = 0; j < n - 1; ++j)
+		{
+			indices[k] = i * n + j;
+			indices[k + 1] = i * n + j + 1;
+			indices[k + 2] = (i + 1) * n + j;
+			indices[k + 3] = (i + 1) * n + j;
+			indices[k + 4] = i * n + j + 1;
+			indices[k + 5] = (i + 1) * n + j + 1;
+			k += 6;
+		}
+	}
+
+	UINT vbByteSize = (UINT)Wave->GetVertexCount() * sizeof(Vertex);
+	UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	std::unique_ptr<MeshGeometry> geo = std::make_unique<MeshGeometry>();
+	geo->Name = "waterGeo";
+
+	geo->VertexBufferCPU = nullptr;
+	geo->VertexBufferGPU = nullptr;
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, geo->IndexBufferCPU.GetAddressOf()));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->IndexBufferGPU = D3DUtil::CreateDefaultBuffer(Device.Get(), CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indices.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["water"] = submesh;
+
+	Geometries.push_back(std::move(geo));
+
+}
+
+void DemoApp::UpdateWave(const GameTimer& gt)
+{
+	static float t_base = 0.0f;
+	if((Timer.GetTotalTime() - t_base)>=0.25f)
+	{
+		t_base += 0.25f;
+
+		int i = MathHelper::Rand(4, Wave->GetRowCount() - 5);
+		int j = MathHelper::Rand(4, Wave->GetColumnCount() - 5);
+
+		float r = MathHelper::RandF(0.2f, 0.5f);
+
+		Wave->Disturb(i, j, r);
+	}
+
+	Wave->Update(gt.GetDeltaTime());
+
+	auto currWavesVB = CurrentFrameResource->WavesVB.get();
+	for(int i = 0; i < Wave->GetVertexCount(); ++i)
+	{
+		Vertex v;
+
+		v.Pos = Wave->GetPosition(i);
+		v.Color = XMFLOAT4(DirectX::Colors::Blue);
+
+		currWavesVB->CopyData(i, v);
+	}
+
+	WaveRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
