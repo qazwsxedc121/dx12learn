@@ -142,10 +142,14 @@ protected:
 	void BuildPSO();
 	void BuildRenderItems();
 
-	void UpdateWave(const GameTimer& gt);
+	void BuildMaterials();
+
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
+
+	void UpdateWave(const GameTimer& gt);
 	void UpdateMainPassCB();
 	void UpdateObjectCBs();
+	void UpdateMaterialCBs(const GameTimer& gt);
 
 
 	std::unique_ptr<Waves> Wave;
@@ -207,15 +211,15 @@ void DemoApp::Render(const GameTimer& gt)
 	D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = DepthStencilView();
 	D3D12_CPU_DESCRIPTOR_HANDLE currentBackBufferView = CurrentBackBufferView();
 	CommandList->OMSetRenderTargets(1, &currentBackBufferView, true, &depthStencilView);
+	/*
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CbvHeap.Get() };
 	CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	*/
 
 	CommandList->SetGraphicsRootSignature(RootSignature.Get());
 
-	int passCbvIndex = PassCbvOffset + CurrentFrameResourceIndex;
-	auto passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(CbvHeap->GetGPUDescriptorHandleForHeapStart());
-	passCbvHandle.Offset(passCbvIndex, CbvSrvUavDescriptorSize);
-	CommandList->SetGraphicsRootDescriptorTable(1, passCbvHandle);
+	CommandList->SetGraphicsRootConstantBufferView(1, CurrentFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+	CommandList->SetGraphicsRootConstantBufferView(2, CurrentFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress());
 
 	DrawRenderItems(CommandList.Get(), OpaqueRitems);
 
@@ -241,14 +245,17 @@ void DemoApp::Init()
 
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 
+	BuildMaterials();
+
 	BuildBoxGeometry();
 	BuildLandGeometry();
 	BuildWaveGeometry();
+
 	BuildRenderItems();
 
-	BuildDescriptorHeaps();
+	//BuildDescriptorHeaps();
 	BuildFrameResources();
-	BuildConstantBuffers();
+	//BuildConstantBuffers();
 
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
@@ -299,17 +306,12 @@ void DemoApp::OnMouseMove(WPARAM btnState, int x, int y)
 
 void DemoApp::BuildRootSignature()
 {
-	CD3DX12_DESCRIPTOR_RANGE cbvTable0;
-	cbvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	CD3DX12_ROOT_PARAMETER rootParameters[3];
+	rootParameters[0].InitAsConstantBufferView(0);
+	rootParameters[1].InitAsConstantBufferView(1);
+	rootParameters[2].InitAsConstantBufferView(2);
 
-	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
-	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-
-	CD3DX12_ROOT_PARAMETER rootParameters[2];
-	rootParameters[0].InitAsDescriptorTable(1, &cbvTable0);
-	rootParameters[1].InitAsDescriptorTable(1, &cbvTable1);
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, rootParameters, 0, nullptr,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(3, rootParameters, 0, nullptr,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> serializedRootSignature = nullptr;
@@ -584,9 +586,32 @@ void DemoApp::BuildRenderItems()
 	}
 }
 
+void DemoApp::BuildMaterials()
+{
+	auto grass = std::make_unique<Material>();
+	grass->Name = "grass";
+	grass->MatCBIndex = 0;
+	grass->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	grass->Roughness = 0.125f;
+
+	auto water = std::make_unique<Material>();
+	water->Name = "water";
+	water->MatCBIndex = 1;
+	water->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
+	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	water->Roughness = 0.0f;
+
+	Materials["grass"] = std::move(grass);
+	Materials["water"] = std::move(water);
+}
+
 void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vector<RenderItem *> &ritems)
 {
 	UINT objCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+	UINT matCBByteSize = D3DUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+
+	auto matBuffer = CurrentFrameResource->MaterialCB->Resource();
 
 	for(size_t i = 0; i < ritems.size(); ++i)
 	{
@@ -597,10 +622,7 @@ void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vec
 		cmdList->IASetIndexBuffer(&ibv);
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
-		UINT cbvIndex = CurrentFrameResourceIndex * (UINT)AllRitems.size() + ri->ObjCBIndex;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(CbvHeap->GetGPUDescriptorHandleForHeapStart());
-		cbvHandle.Offset(cbvIndex, CbvSrvUavDescriptorSize);
-		cmdList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+		cmdList->SetGraphicsRootConstantBufferView(0, CurrentFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 
@@ -725,6 +747,29 @@ void DemoApp::UpdateObjectCBs()
 	}
 }
 
+void DemoApp::UpdateMaterialCBs(const GameTimer &gt)
+{
+	auto currMaterialCB = CurrentFrameResource->MaterialCB.get();
+	for(const auto& pair: Materials)
+	{
+		Material* mat = pair.second.get();
+		if(mat->NumFramesDirty > 0)
+		{
+			XMMATRIX matTransform = XMLoadFloat4x4(&mat->MatTransform);
+
+			MaterialConstants matConstants;
+			matConstants.DiffuseAlbedo = mat->DiffuseAlbedo;
+			matConstants.FresnelR0 = mat->FresnelR0;
+			matConstants.Roughness = mat->Roughness;
+			XMStoreFloat4x4(&matConstants.MatTransform, XMMatrixTranspose(matTransform));
+
+			currMaterialCB->CopyData(mat->MatCBIndex, matConstants);
+
+			mat->NumFramesDirty--;
+		}
+	}
+}
+
 void DemoApp::Update(const GameTimer& gt)
 {
 	float x = Radius * sinf(Phi) * cosf(Theta);
@@ -765,6 +810,7 @@ void DemoApp::Update(const GameTimer& gt)
 
 	UpdateMainPassCB();
 	UpdateObjectCBs();
+	UpdateMaterialCBs(gt);
 }
 
 void DemoApp::BuildWaveGeometry()
