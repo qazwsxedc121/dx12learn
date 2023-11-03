@@ -159,6 +159,21 @@ struct MaterialConstants
     XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
 };
 
+struct Material
+{
+    std::string Name;
+    int MatCBIndex = -1;
+    int DiffuseSrvHeapIndex = -1;
+    int NormalSrvHeapIndex = -1;
+    int NumFramesDirty = 3;
+    UINT MaterialPad0;
+
+    XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float Roughness = .25f;
+    XMFLOAT4 MatTransform;
+};
+
 template<typename T>
 class UploadBuffer
 {

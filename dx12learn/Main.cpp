@@ -50,13 +50,13 @@ public:
 
 	struct RenderItemWorldInfo
 	{
-		uint16_t ObjIndex = -1;
+		std::string ObjName = "";
 		XMFLOAT3 WorldPos = { 0.0f, 0.0f, 0.0f };
 		XMFLOAT3 Scale = { 1.0f, 1.0f, 1.0f };
 		XMFLOAT3 Euler = { 0.0f, 0.0f, 0.0f };
 
-		RenderItemWorldInfo(uint16_t objIndex, XMFLOAT3 worldPos) :
-			ObjIndex(objIndex), WorldPos(worldPos)
+		RenderItemWorldInfo(std::string objName, XMFLOAT3 worldPos) :
+			ObjName(objName), WorldPos(worldPos)
 		{
 
 		}
@@ -101,8 +101,6 @@ protected:
 	FrameResource* CurrentFrameResource = nullptr;
 	int CurrentFrameResourceIndex = 0;
 
-	vector<std::unique_ptr<MeshGeometry>> Geometries;
-
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
 
@@ -128,7 +126,10 @@ protected:
 
 	POINT LastMousePos;
 
-	vector<MeshBuilder::MeshData> MeshDataList;
+	std::unordered_map<std::string, MeshBuilder::MeshData> MeshDataMap;
+	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> GeometriesMap;
+
+	std::unordered_map<std::string, std::unique_ptr<Material>> Materials;
 
 	void BuildDescriptorHeaps();
 	void BuildFrameResources();
@@ -356,44 +357,47 @@ void DemoApp::BuildBoxGeometry()
 	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 	MeshBuilder::MeshData gridData = GridBuilder().BuildGrid(20.0f, 30.0f, 60, 40);
 
-	MeshDataList.push_back(boxData);
-	MeshDataList.push_back(sphereData);
-	MeshDataList.push_back(cylinderData);
-	MeshDataList.push_back(gridData);
+	MeshDataMap["box"] = boxData;
+	MeshDataMap["sphere"] = sphereData;
+	MeshDataMap["cylinder"] = cylinderData;
+	MeshDataMap["grid"] = gridData;
 
-	vector<SubmeshGeometry> submeshGeometries;
+	std::unordered_map<std::string, SubmeshGeometry> submeshGeometries;
 	UINT vertexOffset = 0;
 	UINT indexOffset = 0;
 	UINT totalVertexCount = 0;
-	for (MeshBuilder::MeshData& data : MeshDataList)
+	for (const auto& pair : MeshDataMap)
 	{
 		SubmeshGeometry submesh;
-		submesh.IndexCount = (UINT)data.Indices32.size();
+		submesh.IndexCount = (UINT)pair.second.Indices32.size();
 		submesh.StartIndexLocation = indexOffset;
 		submesh.BaseVertexLocation = vertexOffset;
-		submeshGeometries.push_back(submesh);
+		submeshGeometries[pair.first] = submesh;
 
-		vertexOffset += (UINT)data.Vertices.size();
-		indexOffset += (UINT)data.Indices32.size();
-		totalVertexCount += (UINT)data.Vertices.size();
+		vertexOffset += (UINT)pair.second.Vertices.size();
+		indexOffset += (UINT)pair.second.Indices32.size();
+		totalVertexCount += (UINT)pair.second.Vertices.size();
 	}
 
 	std::vector<Vertex> vertices(totalVertexCount);
 	std::vector<XMVECTORF32> colors = { Colors::Red, Colors::Green, Colors::Blue, Colors::Yellow, Colors::Orange, Colors::Purple, Colors::White, Colors::Black };
 	UINT k = 0;
-	for(size_t i = 0; i < MeshDataList.size(); ++i)
+	UINT i = 0;
+	for(const auto& meshDataPair: MeshDataMap)
 	{
-		for(size_t j = 0; j < MeshDataList[i].Vertices.size(); ++j, ++k)
+		for(size_t j = 0; j < meshDataPair.second.Vertices.size(); ++j, ++k)
 		{
-			vertices[k].Pos = MeshDataList[i].Vertices[j].Position;
+			vertices[k].Pos = meshDataPair.second.Vertices[j].Position;
 			vertices[k].Color = XMFLOAT4(colors[i % colors.size()]);
 		}
+		++i;
 	}
 
 	std::vector<std::uint16_t> indices;
-	for(size_t i = 0; i < MeshDataList.size(); ++i)
+	for(const auto& meshDataPair: MeshDataMap)
 	{
-		indices.insert(indices.end(), std::begin(MeshDataList[i].GetIndices16()), std::end(MeshDataList[i].GetIndices16()));
+		std::vector<uint16_t> meshIndicesData = meshDataPair.second.GetIndices16();
+		indices.insert(indices.end(), std::begin(meshIndicesData), std::end(meshIndicesData));
 	}
 
 
@@ -420,12 +424,12 @@ void DemoApp::BuildBoxGeometry()
 	Geometry->IndexFormat = DXGI_FORMAT_R16_UINT;
 	Geometry->IndexBufferByteSize = ibByteSize;
 
-	for(size_t i = 0; i < submeshGeometries.size(); ++i)
+	for (const auto& pair : MeshDataMap)
 	{
-		Geometry->DrawArgs["shape_" + std::to_string(i)] = submeshGeometries[i];
+		Geometry->DrawArgs[pair.first] = submeshGeometries[pair.first];
 	}
 
-	Geometries.push_back(std::move(Geometry));
+	GeometriesMap["shapeGeo"] = std::move(Geometry);
 }
 
 void DemoApp::BuildLandGeometry()
@@ -489,7 +493,7 @@ void DemoApp::BuildLandGeometry()
 
 	geo->DrawArgs["grid"] = submesh;
 
-	Geometries.push_back(std::move(geo));
+	GeometriesMap["landGeo"] = std::move(geo);
 
 }
 
@@ -526,50 +530,50 @@ void DemoApp::BuildPSO()
 void DemoApp::BuildRenderItems()
 {
 	vector<RenderItemWorldInfo> renderItemWorldInfos = {
-		RenderItemWorldInfo(0, XMFLOAT3(0.0f, 0.5f, 0.0f)),
-		RenderItemWorldInfo(3, XMFLOAT3(0.0f, 0.0f, 0.0f)),
+		RenderItemWorldInfo("box", XMFLOAT3(0.0f, 0.5f, 0.0f)),
+		RenderItemWorldInfo("grid", XMFLOAT3(0.0f, 0.0f, 0.0f)),
 	};
 	for(int i = 0; i < 5; ++i)
 	{
-		renderItemWorldInfos.push_back(RenderItemWorldInfo(2, XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
-		renderItemWorldInfos.push_back(RenderItemWorldInfo(2, XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f)));
 
-		renderItemWorldInfos.push_back(RenderItemWorldInfo(1, XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f)));
-		renderItemWorldInfos.push_back(RenderItemWorldInfo(1, XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo("sphere", XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f)));
+		renderItemWorldInfos.push_back(RenderItemWorldInfo("sphere", XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f)));
 	}
 
 	for(size_t i = 0; i < renderItemWorldInfos.size(); ++i)
 	{
 		auto ritem = std::make_unique<RenderItem>();
 		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(renderItemWorldInfos[i].WorldPos.x, renderItemWorldInfos[i].WorldPos.y, renderItemWorldInfos[i].WorldPos.z));
-		uint16_t objIndex = renderItemWorldInfos[i].ObjIndex;
+		const std::string& objName = renderItemWorldInfos[i].ObjName;
 		ritem->ObjCBIndex = i;
-		ritem->Geo = Geometries[0].get();
+		ritem->Geo = GeometriesMap["shapeGeo"].get();
 		ritem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		ritem->IndexCount = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].IndexCount;
-		ritem->StartIndexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].StartIndexLocation;
-		ritem->BaseVertexLocation = ritem->Geo->DrawArgs["shape_" + std::to_string(objIndex)].BaseVertexLocation;
+		ritem->IndexCount = ritem->Geo->DrawArgs[objName].IndexCount;
+		ritem->StartIndexLocation = ritem->Geo->DrawArgs[objName].StartIndexLocation;
+		ritem->BaseVertexLocation = ritem->Geo->DrawArgs[objName].BaseVertexLocation;
 		AllRitems.push_back(std::move(ritem));
 	}
 
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	gridRitem->ObjCBIndex = renderItemWorldInfos.size();
-	gridRitem->Geo = Geometries[1].get();
+	gridRitem->Geo = GeometriesMap["landGeo"].get();
 	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->IndexCount = Geometries[1]->DrawArgs["grid"].IndexCount;
-	gridRitem->StartIndexLocation = Geometries[1]->DrawArgs["grid"].StartIndexLocation;
-	gridRitem->BaseVertexLocation = Geometries[1]->DrawArgs["grid"].BaseVertexLocation;
+	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
+	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 	AllRitems.push_back(std::move(gridRitem));
 
 	auto wavesRitem = std::make_unique<RenderItem>();
 	wavesRitem->World = MathHelper::Identity4x4();
 	wavesRitem->ObjCBIndex = renderItemWorldInfos.size() + 1;
-	wavesRitem->Geo = Geometries[2].get();
+	wavesRitem->Geo = GeometriesMap["waterGeo"].get();
 	wavesRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	wavesRitem->IndexCount = Geometries[2]->DrawArgs["water"].IndexCount;
-	wavesRitem->StartIndexLocation = Geometries[2]->DrawArgs["water"].StartIndexLocation;
-	wavesRitem->BaseVertexLocation = Geometries[2]->DrawArgs["water"].BaseVertexLocation;
+	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["water"].IndexCount;
+	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["water"].StartIndexLocation;
+	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["water"].BaseVertexLocation;
 	WaveRitem = wavesRitem.get();
 	AllRitems.push_back(std::move(wavesRitem));
 
@@ -812,7 +816,7 @@ void DemoApp::BuildWaveGeometry()
 
 	geo->DrawArgs["water"] = submesh;
 
-	Geometries.push_back(std::move(geo));
+	GeometriesMap["waterGeo"] = std::move(geo);
 
 }
 

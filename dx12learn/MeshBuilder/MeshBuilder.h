@@ -45,7 +45,7 @@ public:
         std::vector<Vertex> Vertices;
         std::vector<uint32> Indices32;
 
-        std::vector<uint16>& GetIndices16()
+        std::vector<uint16>& GetIndices16() const
         {
             if (mIndices16.empty())
             {
@@ -57,7 +57,7 @@ public:
             return mIndices16;
         }
     private:
-        std::vector<uint16> mIndices16;
+        mutable std::vector<uint16> mIndices16;
     };
 
 protected:
