@@ -41,6 +41,7 @@ public:
 		XMFLOAT4X4 World = MathHelper::Identity4x4();
 		int NumFramesDirty = DemoApp::NumFrameResources;
 		UINT ObjCBIndex = -1;
+		Material* Mat = nullptr;
 		MeshGeometry* Geo = nullptr;
 		D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		UINT IndexCount = 0;
@@ -219,7 +220,6 @@ void DemoApp::Render(const GameTimer& gt)
 	CommandList->SetGraphicsRootSignature(RootSignature.Get());
 
 	CommandList->SetGraphicsRootConstantBufferView(1, CurrentFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
-	CommandList->SetGraphicsRootConstantBufferView(2, CurrentFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress());
 
 	DrawRenderItems(CommandList.Get(), OpaqueRitems);
 
@@ -555,6 +555,7 @@ void DemoApp::BuildRenderItems()
 		ritem->IndexCount = ritem->Geo->DrawArgs[objName].IndexCount;
 		ritem->StartIndexLocation = ritem->Geo->DrawArgs[objName].StartIndexLocation;
 		ritem->BaseVertexLocation = ritem->Geo->DrawArgs[objName].BaseVertexLocation;
+		ritem->Mat = Materials["grass"].get();
 		AllRitems.push_back(std::move(ritem));
 	}
 
@@ -566,6 +567,7 @@ void DemoApp::BuildRenderItems()
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	gridRitem->Mat = Materials["grass"].get();
 	AllRitems.push_back(std::move(gridRitem));
 
 	auto wavesRitem = std::make_unique<RenderItem>();
@@ -576,7 +578,8 @@ void DemoApp::BuildRenderItems()
 	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["water"].IndexCount;
 	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["water"].StartIndexLocation;
 	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["water"].BaseVertexLocation;
-	WaveRitem = wavesRitem.get();
+	wavesRitem->Mat = Materials["water"].get();
+	this->WaveRitem = wavesRitem.get();
 	AllRitems.push_back(std::move(wavesRitem));
 
 
@@ -623,6 +626,7 @@ void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vec
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
 		cmdList->SetGraphicsRootConstantBufferView(0, CurrentFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize);
+		//cmdList->SetGraphicsRootConstantBufferView(2, matBuffer->GetGPUVirtualAddress() + ri->Mat->MatCBIndex * matCBByteSize);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 
