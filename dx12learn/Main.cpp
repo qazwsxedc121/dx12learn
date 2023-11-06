@@ -11,6 +11,7 @@
 #include "MeshBuilder/MeshSphereBuilder.h"
 #include "MeshBuilder/MeshCylinderBuilder.h"
 #include "MeshBuilder/MeshGridBuilder.h"
+#include "MeshBuilder/MeshObjBuilder.h"
 #include "Simulation/Waves.h"
 #include "FrameResource.h"
 
@@ -373,11 +374,13 @@ void DemoApp::BuildBoxGeometry()
 	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.5f, 20, 20);
 	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 	MeshBuilder::MeshData gridData = GridBuilder().BuildGrid(20.0f, 30.0f, 60, 40);
+	MeshBuilder::MeshData teapotData = MeshObjBuilder().BuildByObjFile("Assets/Model/teapot.obj");
 
 	MeshDataMap["box"] = boxData;
 	MeshDataMap["sphere"] = sphereData;
 	MeshDataMap["cylinder"] = cylinderData;
 	MeshDataMap["grid"] = gridData;
+	MeshDataMap["teapot"] = teapotData;
 
 	std::unordered_map<std::string, SubmeshGeometry> submeshGeometries;
 	UINT vertexOffset = 0;
@@ -551,7 +554,9 @@ void DemoApp::BuildRenderItems()
 	vector<RenderItemWorldInfo> renderItemWorldInfos = {
 		RenderItemWorldInfo("box", XMFLOAT3(0.0f, 0.5f, 0.0f)),
 		RenderItemWorldInfo("grid", XMFLOAT3(0.0f, 0.0f, 0.0f)),
+		RenderItemWorldInfo("teapot", XMFLOAT3(0.0f, 2.5f, 0.0f)),
 	};
+	renderItemWorldInfos[2].Scale = XMFLOAT3(0.03f, 0.03f, 0.03f);
 	for(int i = 0; i < 5; ++i)
 	{
 		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
@@ -564,7 +569,10 @@ void DemoApp::BuildRenderItems()
 	for(size_t i = 0; i < renderItemWorldInfos.size(); ++i)
 	{
 		auto ritem = std::make_unique<RenderItem>();
-		XMStoreFloat4x4(&ritem->World, XMMatrixTranslation(renderItemWorldInfos[i].WorldPos.x, renderItemWorldInfos[i].WorldPos.y, renderItemWorldInfos[i].WorldPos.z));
+		XMMATRIX rItemWorld = XMMatrixRotationRollPitchYaw(renderItemWorldInfos[i].Euler.x, renderItemWorldInfos[i].Euler.y, renderItemWorldInfos[i].Euler.z);
+		rItemWorld = XMMatrixMultiply(rItemWorld, XMMatrixScaling(renderItemWorldInfos[i].Scale.x, renderItemWorldInfos[i].Scale.y, renderItemWorldInfos[i].Scale.z));
+		rItemWorld = XMMatrixMultiply(rItemWorld, XMMatrixTranslation(renderItemWorldInfos[i].WorldPos.x, renderItemWorldInfos[i].WorldPos.y, renderItemWorldInfos[i].WorldPos.z));
+		XMStoreFloat4x4(&ritem->World, rItemWorld);
 		const std::string& objName = renderItemWorldInfos[i].ObjName;
 		ritem->ObjCBIndex = i;
 		ritem->Geo = GeometriesMap["shapeGeo"].get();

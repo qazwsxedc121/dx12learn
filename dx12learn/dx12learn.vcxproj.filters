@@ -66,6 +66,9 @@
     <ClCompile Include="Simulation\Waves.cpp">
       <Filter>源文件\Simulation</Filter>
     </ClCompile>
+    <ClCompile Include="MeshBuilder\MeshObjBuilder.cpp">
+      <Filter>源文件\MeshBuilder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -109,6 +112,9 @@
     </ClInclude>
     <ClInclude Include="Simulation\Waves.h">
       <Filter>头文件\Simulation</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshBuilder\MeshObjBuilder.h">
+      <Filter>头文件\MeshBuilder</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

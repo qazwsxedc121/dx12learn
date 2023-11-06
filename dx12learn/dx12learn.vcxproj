@@ -143,6 +143,7 @@
     <ClCompile Include="MeshBuilder\MeshBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshCylinderBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshGridBuilder.cpp" />
+    <ClCompile Include="MeshBuilder\MeshObjBuilder.cpp" />
     <ClCompile Include="MeshBuilder\MeshSphereBuilder.cpp" />
     <ClCompile Include="Simulation\Waves.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -161,6 +162,7 @@
     <ClInclude Include="MeshBuilder\MeshBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshCylinderBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshGridBuilder.h" />
+    <ClInclude Include="MeshBuilder\MeshObjBuilder.h" />
     <ClInclude Include="MeshBuilder\MeshSphereBuilder.h" />
     <ClInclude Include="MeshCylinderBuilder.h" />
     <ClInclude Include="Simulation\Waves.h" />
