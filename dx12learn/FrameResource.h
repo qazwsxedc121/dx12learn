@@ -24,11 +24,15 @@ struct PassConstants
     float FarZ = 0.0f;
     float TotalTime = 0.0f;
     float DeltaTime = 0.0f;
+
+    DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
+    Light Lights[MaxLights];
 };
 
 struct Vertex
 {
     DirectX::XMFLOAT3 Pos;
+    DirectX::XMFLOAT3 Normal;
     DirectX::XMFLOAT4 Color;
 };
 

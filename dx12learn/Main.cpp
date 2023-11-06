@@ -93,6 +93,19 @@ protected:
 	{
 		return 0.3f * (z * sinf(0.1f*x) + x * cosf(0.1f * z));
 	}
+	XMFLOAT3 GetHillsNormal(float x, float z) const
+	{
+		XMFLOAT3 n(
+			-0.03f * z * cosf(0.1f * x) - 0.3f * cosf(0.1f * z),
+			1.0f,
+			-0.3f * sinf(0.1f * x) + 0.03f * x * sinf(0.1f * z)
+		);
+		XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&n));
+		XMStoreFloat3(&n, unitNormal);
+		return n;
+	}
+
+	virtual void OnKeyboardInput(const GameTimer& gt);
 
 protected:
 	ComPtr<ID3D12RootSignature> RootSignature;
@@ -122,6 +135,8 @@ protected:
 	float Theta = 1.5f * XM_PI;
 	float Phi = XM_PIDIV4;
 
+	XMFLOAT3 EyePos = { 0.0f, 0.0f, 0.0f };
+
 	XMFLOAT4X4 View = MathHelper::Identity4x4();
 	XMFLOAT4X4 Proj = MathHelper::Identity4x4();
 
@@ -132,6 +147,9 @@ protected:
 
 	std::unordered_map<std::string, std::unique_ptr<Material>> Materials;
 
+	float SunTheta = 1.25f * XM_PI;
+	float SunPhi = XM_PIDIV4;
+	
 	void BuildDescriptorHeaps();
 	void BuildFrameResources();
 	void BuildConstantBuffers();
@@ -341,18 +359,15 @@ void DemoApp::BuildShadersAndInputLayout()
 	InputLayout = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
 		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,0, 12,
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
+		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,0, 24,
 		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 }
 
 void DemoApp::BuildBoxGeometry()
 {
-	struct Vertex
-	{
-		XMFLOAT3 Pos;
-		XMFLOAT4 Color;
-	};
 
 	MeshBuilder::MeshData boxData = BoxBuilder().BuildBox(1.0f, 1.5f, 1.5f, 3);
 	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.5f, 20, 20);
@@ -390,6 +405,7 @@ void DemoApp::BuildBoxGeometry()
 		for(size_t j = 0; j < meshDataPair.second.Vertices.size(); ++j, ++k)
 		{
 			vertices[k].Pos = meshDataPair.second.Vertices[j].Position;
+			vertices[k].Normal = meshDataPair.second.Vertices[j].Normal;
 			vertices[k].Color = XMFLOAT4(colors[i % colors.size()]);
 		}
 		++i;
@@ -444,6 +460,7 @@ void DemoApp::BuildLandGeometry()
 		auto& p = grid.Vertices[i].Position;
 		vertices[i].Pos = p;
 		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
+		vertices[i].Normal = GetHillsNormal(p.x, p.z);
 
 		if(vertices[i].Pos.y < -10.0f)
 		{
@@ -594,14 +611,14 @@ void DemoApp::BuildMaterials()
 	auto grass = std::make_unique<Material>();
 	grass->Name = "grass";
 	grass->MatCBIndex = 0;
-	grass->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	grass->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass->Roughness = 0.125f;
 
 	auto water = std::make_unique<Material>();
 	water->Name = "water";
 	water->MatCBIndex = 1;
-	water->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
+	water->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f);
 	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	water->Roughness = 0.0f;
 
@@ -626,7 +643,7 @@ void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vec
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
 		cmdList->SetGraphicsRootConstantBufferView(0, CurrentFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize);
-		//cmdList->SetGraphicsRootConstantBufferView(2, matBuffer->GetGPUVirtualAddress() + ri->Mat->MatCBIndex * matCBByteSize);
+		cmdList->SetGraphicsRootConstantBufferView(2, matBuffer->GetGPUVirtualAddress() + ri->Mat->MatCBIndex * matCBByteSize);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 
@@ -655,13 +672,19 @@ void DemoApp::UpdateMainPassCB()
 	XMStoreFloat4x4(&MainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&MainPassCB.ViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&MainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
-	MainPassCB.EyePosW = { 0.0f, 0.0f, 0.0f };
+	MainPassCB.EyePosW = EyePos;
 	MainPassCB.RenderTargetSize = { (float)ClientWidth, (float)ClientHeight };
 	MainPassCB.InvRenderTargetSize = { 1.0f / ClientWidth, 1.0f / ClientHeight };
 	MainPassCB.NearZ = 1.0f;
 	MainPassCB.FarZ = 1000.0f;
 	MainPassCB.TotalTime = 0.0f;
 	MainPassCB.DeltaTime = 0.0f;
+	MainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
+
+	XMVECTOR lightDir = -MathHelper::SphericalToCartesian(1.0f, SunTheta, SunPhi);
+	XMStoreFloat3(&MainPassCB.Lights[0].Direction, lightDir);
+	MainPassCB.Lights[0].Strength = { 1.0f, 1.0f, 0.9f };
+
 
 	CurrentFrameResource->PassCB->CopyData(0, MainPassCB);
 }
@@ -687,7 +710,7 @@ void DemoApp::BuildFrameResources()
 {
 	for(int i = 0; i < NumFrameResources; ++i)
 	{
-		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), 1, 128*128));
+		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), 2, 128*128));
 	}
 }
 
@@ -789,6 +812,8 @@ void DemoApp::Update(const GameTimer& gt)
 		boxRitem->NumFramesDirty = NumFrameResources;
 	}
 
+	EyePos = { x, y, z };
+
 	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
 	XMVECTOR target = XMVectorZero();
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -811,6 +836,7 @@ void DemoApp::Update(const GameTimer& gt)
 	}
 
 	UpdateWave(gt);
+	OnKeyboardInput(gt);
 
 	UpdateMainPassCB();
 	UpdateObjectCBs();
@@ -894,9 +920,37 @@ void DemoApp::UpdateWave(const GameTimer& gt)
 
 		v.Pos = Wave->GetPosition(i);
 		v.Color = XMFLOAT4(DirectX::Colors::Blue);
+		v.Normal = Wave->GetNormal(i);
 
 		currWavesVB->CopyData(i, v);
 	}
 
 	WaveRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
+}
+
+void DemoApp::OnKeyboardInput(const GameTimer &gt)
+{
+	const float dt = gt.GetDeltaTime();
+
+	if(GetAsyncKeyState(VK_LEFT) & 0x8000)
+	{
+		SunTheta -= 1.0f * dt;
+	}
+	
+	if(GetAsyncKeyState(VK_RIGHT) & 0x8000)
+	{
+		SunTheta += 1.0f * dt;
+	}
+
+	if(GetAsyncKeyState(VK_UP) & 0x8000)
+	{
+		SunPhi -= 1.0f * dt;
+	}
+
+	if(GetAsyncKeyState(VK_DOWN) & 0x8000)
+	{
+		SunPhi += 1.0f * dt;
+	}
+
+	SunPhi = MathHelper::Clamp(SunPhi, 0.1f, XM_PIDIV2);
 }
