@@ -125,4 +125,9 @@
       <Filter>资源文件</Filter>
     </FxCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="Textures\ganges_river_pebbles_1k\textures\ganges_river_pebbles_diff_1k.png">
+      <Filter>资源文件</Filter>
+    </Image>
+  </ItemGroup>
 </Project>

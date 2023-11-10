@@ -15,6 +15,9 @@
 #include "Simulation/Waves.h"
 #include "FrameResource.h"
 
+#include "ResourceUploadBatch.h"
+#include "DDSTextureLoader.h"
+
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -106,6 +109,7 @@ protected:
 		return n;
 	}
 
+
 	virtual void OnKeyboardInput(const GameTimer& gt);
 
 protected:
@@ -161,6 +165,7 @@ protected:
 	void BuildWaveGeometry();
 	void BuildPSO();
 	void BuildRenderItems();
+	void LoadTextures();
 
 	void BuildMaterials();
 
@@ -264,6 +269,7 @@ void DemoApp::Init()
 
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 
+	LoadTextures();
 	BuildMaterials();
 
 	BuildBoxGeometry();
@@ -362,6 +368,8 @@ void DemoApp::BuildShadersAndInputLayout()
 		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
 		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,0, 24,
+		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,0, 24,
 		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
@@ -410,6 +418,7 @@ void DemoApp::BuildBoxGeometry()
 			vertices[k].Pos = meshDataPair.second.Vertices[j].Position;
 			vertices[k].Normal = meshDataPair.second.Vertices[j].Normal;
 			vertices[k].Color = XMFLOAT4(colors[i % colors.size()]);
+			vertices[k].TexC = meshDataPair.second.Vertices[j].TexC;
 		}
 		++i;
 	}
@@ -464,6 +473,7 @@ void DemoApp::BuildLandGeometry()
 		vertices[i].Pos = p;
 		vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
 		vertices[i].Normal = GetHillsNormal(p.x, p.z);
+		vertices[i].TexC = grid.Vertices[i].TexC;
 
 		if(vertices[i].Pos.y < -10.0f)
 		{
@@ -934,6 +944,21 @@ void DemoApp::UpdateWave(const GameTimer& gt)
 	}
 
 	WaveRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
+}
+
+void DemoApp::LoadTextures()
+{
+	auto riverPebbleTexture = std::make_unique<Texture>();
+	riverPebbleTexture->Name = "riverPebbleTex";
+	riverPebbleTexture->Filename = L"/Textures/ganges_river_pebbles_1k/textures/ganges_river_plbbles_diff_1k.dds";
+	DirectX::ResourceUploadBatch UploadBatch(Device.Get());
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile(
+		Device.Get(),
+		UploadBatch,
+		riverPebbleTexture->Filename.c_str(),
+		riverPebbleTexture->Resource.GetAddressOf()));
+
+
 }
 
 void DemoApp::OnKeyboardInput(const GameTimer &gt)

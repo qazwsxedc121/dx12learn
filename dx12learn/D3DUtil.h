@@ -241,3 +241,11 @@ private:
     UINT ElementByteSize = 0;
     bool IsConstantBuffer = false;
 };
+
+struct Texture
+{
+    std::string Name;
+    std::wstring Filename;
+    ComPtr<ID3D12Resource> Resource = nullptr;
+    ComPtr<ID3D12Resource> UploadHeap = nullptr;
+};
