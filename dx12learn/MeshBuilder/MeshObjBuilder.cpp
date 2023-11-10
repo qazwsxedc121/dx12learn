@@ -49,11 +49,26 @@ MeshBuilder::MeshData MeshObjBuilder::BuildByObjFile(const std::string &filename
 		else if(!line.compare(0, 2, "f "))
 		{
 			iss >> trash;
-			std::array<uint32, 3> face;
-			iss >> face[0] >> face[1] >> face[2];
-			meshData.Indices32.push_back(face[0]);
-			meshData.Indices32.push_back(face[1]);
-			meshData.Indices32.push_back(face[2]);
+			std::array<uint32, 3> face = {0, 0, 0};
+			std::array<uint32, 3> normal = {0, 0, 0};
+			std::array<uint32, 3> texcoord = {0, 0, 0};
+			for(int i = 0; i < 3; i++)
+			{
+				iss >> face[i];
+				if(iss.peek() == '/')
+				{
+					iss >> trash;
+					if(iss.peek() != '/')
+					{
+						iss >> texcoord[i];
+					}
+					iss >> trash;
+					iss >> normal[i];
+				}
+			}
+			meshData.Indices32.push_back(face[0]-1);
+			meshData.Indices32.push_back(face[1]-1);
+			meshData.Indices32.push_back(face[2]-1);
 		}
 	}
 	fin.close();

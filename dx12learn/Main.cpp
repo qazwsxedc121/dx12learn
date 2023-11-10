@@ -382,7 +382,7 @@ void DemoApp::BuildBoxGeometry()
 	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.5f, 20, 20);
 	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 	MeshBuilder::MeshData gridData = GridBuilder().BuildGrid(20.0f, 30.0f, 60, 40);
-	MeshBuilder::MeshData teapotData = MeshObjBuilder().BuildByObjFile("Assets/Model/teapot.obj");
+	MeshBuilder::MeshData teapotData = MeshObjBuilder().BuildByObjFile("Assets/Model/teapot.wobj");
 
 	MeshDataMap["box"] = boxData;
 	MeshDataMap["sphere"] = sphereData;
@@ -566,7 +566,6 @@ void DemoApp::BuildRenderItems()
 		RenderItemWorldInfo("grid", XMFLOAT3(0.0f, 0.0f, 0.0f)),
 		RenderItemWorldInfo("teapot", XMFLOAT3(0.0f, 2.5f, 0.0f)),
 	};
-	renderItemWorldInfos[2].Scale = XMFLOAT3(0.03f, 0.03f, 0.03f);
 	for(int i = 0; i < 5; ++i)
 	{
 		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
@@ -950,8 +949,9 @@ void DemoApp::LoadTextures()
 {
 	auto riverPebbleTexture = std::make_unique<Texture>();
 	riverPebbleTexture->Name = "riverPebbleTex";
-	riverPebbleTexture->Filename = L"/Textures/ganges_river_pebbles_1k/textures/ganges_river_plbbles_diff_1k.dds";
+	riverPebbleTexture->Filename = L"./Textures/ganges_river_pebbles_1k/textures/ganges_river_pebbles_diff_1k.dds";
 	DirectX::ResourceUploadBatch UploadBatch(Device.Get());
+	UploadBatch.Begin();
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile(
 		Device.Get(),
 		UploadBatch,
