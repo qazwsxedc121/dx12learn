@@ -42,12 +42,16 @@ cbuffer cbPass : register(b1)
 	Light Lights[16];
 }
 
+Texture2D DiffuseMap : register(t0);
+SamplerState DiffuseMapSampler : register(s0);
+
 struct VertexOut
 {
 	float4 position : SV_POSITION;
 	float3 PosW : POSITION;
 	float3 NormalW : NORMAL;
 	float4 color : COLOR;
+	float2 Tex : TEXCOORD;
 };
 
 float4 PS(VertexOut input) : SV_TARGET
@@ -56,14 +60,16 @@ float4 PS(VertexOut input) : SV_TARGET
 
 	float3 toEyeW = normalize(EyePosW - input.PosW);
 
-	float4 ambient = AmbientLight * DiffuseAlbedo;
+	float4 DiffuseAlbedoColor = DiffuseMap.Sample(DiffuseMapSampler, input.Tex) * DiffuseAlbedo;
 
-	Material mat = { DiffuseAlbedo, FresnelR0, Roughness };
+	float4 ambient = AmbientLight * DiffuseAlbedoColor;
+
+	Material mat = { DiffuseAlbedoColor, FresnelR0, Roughness };
 	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
 	float4 directLight = ComputeLighting(Lights, mat, input.PosW, input.NormalW, toEyeW, shadowFactor);
 
 	//float4 litColor = ambient;// + directLight;
-	float4 litColor = ambient + directLight * input.color;
+	float4 litColor = ambient + directLight;
 
 	litColor.a = DiffuseAlbedo.a;
 

@@ -3,6 +3,7 @@
 cbuffer cbPerObject : register( b0 )
 {
 	float4x4 gWorld;
+	float4x4 TexTransform;
 };
 
 cbuffer cbPass : register(b1)
@@ -26,10 +27,20 @@ cbuffer cbPass : register(b1)
 	Light Lights[16];
 }
 
+cbuffer cbMaterial : register(b2)
+{
+	float4 DiffuseAlbedo;
+	float3 FresnelR0;
+	float  Roughness;
+	float4x4 MatTransform;
+};
+
+
 struct VertexIn
 {
 	float3 PosL : POSITION;
 	float3 NormalL : NORMAL;
+	float2 Tex : TEXCOORD;
 	float4 Color : COLOR;
 };
 
@@ -39,6 +50,7 @@ struct VertexOut
 	float3 PosW : POSITION;
 	float3 NormalW : NORMAL;
 	float4 Color : COLOR;
+	float2 Tex : TEXCOORD;
 };
 
 VertexOut VS( VertexIn vin )
@@ -50,5 +62,7 @@ VertexOut VS( VertexIn vin )
 	vout.NormalW = mul( vin.NormalL, (float3x3)gWorld );
 	vout.PosH = mul(posW, gViewProj);
 	vout.Color = vin.Color;
+	float4 texC = mul( float4( vin.Tex, 0.0f, 1.0f ), TexTransform);
+	vout.Tex = mul(texC, MatTransform).xy;
 	return vout;
 }

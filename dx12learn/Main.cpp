@@ -80,7 +80,7 @@ protected:
 
 	virtual void Update(const GameTimer& gt) override;
 	virtual void Render(const GameTimer& gt) override;
-	virtual void OnResize() override;	
+	virtual void OnResize() override;
 	virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y) override
 	{
@@ -95,7 +95,7 @@ protected:
 	}
 	float GetHillsHeight(float x, float z) const
 	{
-		return 0.3f * (z * sinf(0.1f*x) + x * cosf(0.1f * z));
+		return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
 	}
 	XMFLOAT3 GetHillsNormal(float x, float z) const
 	{
@@ -154,6 +154,14 @@ protected:
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> GeometriesMap;
 
 	std::unordered_map<std::string, std::unique_ptr<Material>> Materials;
+
+	const CD3DX12_STATIC_SAMPLER_DESC SamplerDesc = {
+		0,
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+	};
 
 	float SunTheta = 1.25f * XM_PI;
 	float SunPhi = XM_PIDIV4;
@@ -346,7 +354,7 @@ void DemoApp::BuildRootSignature()
 	rootParameters[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);  // per material cbv
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(
-		constexpr(sizeof(rootParameters) / sizeof(CD3DX12_ROOT_PARAMETER)), rootParameters, 0, nullptr,
+		constexpr(sizeof(rootParameters) / sizeof(CD3DX12_ROOT_PARAMETER)), rootParameters, 1, &SamplerDesc,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> serializedRootSignature = nullptr;
@@ -646,7 +654,7 @@ void DemoApp::BuildMaterials()
 	auto water = std::make_unique<Material>();
 	water->Name = "water";
 	water->MatCBIndex = 1;
-	grass->DiffuseSrvHeapIndex = 0;
+	water->DiffuseSrvHeapIndex = 0;
 	water->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f);
 	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	water->Roughness = 0.0f;
@@ -676,7 +684,7 @@ void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vec
 
 		CD3DX12_GPU_DESCRIPTOR_HANDLE tex(SrvHeap->GetGPUDescriptorHandleForHeapStart());
 		tex.Offset(ri->Mat->DiffuseSrvHeapIndex, CbvSrvUavDescriptorSize);
-		//cmdList->SetGraphicsRootDescriptorTable(3, tex);
+		cmdList->SetGraphicsRootDescriptorTable(3, tex);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 
