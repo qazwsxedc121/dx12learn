@@ -115,10 +115,13 @@ protected:
 protected:
 	ComPtr<ID3D12RootSignature> RootSignature;
 	ComPtr<ID3D12DescriptorHeap> CbvHeap;
+	ComPtr<ID3D12DescriptorHeap> SrvHeap;
 
 	std::vector<std::unique_ptr<FrameResource>> FrameResources;
 	FrameResource* CurrentFrameResource = nullptr;
 	int CurrentFrameResourceIndex = 0;
+
+	std::unordered_map<std::string, std::unique_ptr<Texture>> Textures;
 
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
@@ -158,6 +161,7 @@ protected:
 	void BuildDescriptorHeaps();
 	void BuildFrameResources();
 	void BuildConstantBuffers();
+	void BuildShaderResourceView();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildBoxGeometry();
@@ -236,10 +240,9 @@ void DemoApp::Render(const GameTimer& gt)
 	D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = DepthStencilView();
 	D3D12_CPU_DESCRIPTOR_HANDLE currentBackBufferView = CurrentBackBufferView();
 	CommandList->OMSetRenderTargets(1, &currentBackBufferView, true, &depthStencilView);
-	/*
-	ID3D12DescriptorHeap* descriptorHeaps[] = { CbvHeap.Get() };
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = {SrvHeap.Get() };
 	CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-	*/
 
 	CommandList->SetGraphicsRootSignature(RootSignature.Get());
 
@@ -278,8 +281,9 @@ void DemoApp::Init()
 
 	BuildRenderItems();
 
-	//BuildDescriptorHeaps();
+	BuildDescriptorHeaps();
 	BuildFrameResources();
+	BuildShaderResourceView();
 	//BuildConstantBuffers();
 
 	BuildRootSignature();
@@ -331,12 +335,18 @@ void DemoApp::OnMouseMove(WPARAM btnState, int x, int y)
 
 void DemoApp::BuildRootSignature()
 {
-	CD3DX12_ROOT_PARAMETER rootParameters[3];
-	rootParameters[0].InitAsConstantBufferView(0);
-	rootParameters[1].InitAsConstantBufferView(1);
-	rootParameters[2].InitAsConstantBufferView(2);
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(3, rootParameters, 0, nullptr,
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+	CD3DX12_ROOT_PARAMETER rootParameters[4];
+	rootParameters[0].InitAsConstantBufferView(0);  // per object cbv
+	rootParameters[1].InitAsConstantBufferView(1);  // per pass cbv
+	rootParameters[2].InitAsConstantBufferView(2);  // per material cbv
+	rootParameters[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);  // per material cbv
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(
+		constexpr(sizeof(rootParameters) / sizeof(CD3DX12_ROOT_PARAMETER)), rootParameters, 0, nullptr,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> serializedRootSignature = nullptr;
@@ -628,6 +638,7 @@ void DemoApp::BuildMaterials()
 	auto grass = std::make_unique<Material>();
 	grass->Name = "grass";
 	grass->MatCBIndex = 0;
+	grass->DiffuseSrvHeapIndex = 0;
 	grass->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass->Roughness = 0.125f;
@@ -635,6 +646,7 @@ void DemoApp::BuildMaterials()
 	auto water = std::make_unique<Material>();
 	water->Name = "water";
 	water->MatCBIndex = 1;
+	grass->DiffuseSrvHeapIndex = 0;
 	water->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f);
 	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	water->Roughness = 0.0f;
@@ -661,6 +673,10 @@ void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vec
 
 		cmdList->SetGraphicsRootConstantBufferView(0, CurrentFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize);
 		cmdList->SetGraphicsRootConstantBufferView(2, matBuffer->GetGPUVirtualAddress() + ri->Mat->MatCBIndex * matCBByteSize);
+
+		CD3DX12_GPU_DESCRIPTOR_HANDLE tex(SrvHeap->GetGPUDescriptorHandleForHeapStart());
+		tex.Offset(ri->Mat->DiffuseSrvHeapIndex, CbvSrvUavDescriptorSize);
+		//cmdList->SetGraphicsRootDescriptorTable(3, tex);
 
 		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 
@@ -721,6 +737,13 @@ void DemoApp::BuildDescriptorHeaps()
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	cbvHeapDesc.NodeMask = 0;
 	ThrowIfFailed(Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(CbvHeap.GetAddressOf())));
+
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
+	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	srvHeapDesc.NodeMask = 0;
+	ThrowIfFailed(Device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(SrvHeap.GetAddressOf())));
 }
 
 void DemoApp::BuildFrameResources()
@@ -771,6 +794,25 @@ void DemoApp::BuildConstantBuffers()
 		cbvDesc.SizeInBytes = passCBByteSize;
 
 		Device->CreateConstantBufferView(&cbvDesc, handle);
+	}
+}
+
+void DemoApp::BuildShaderResourceView()
+{
+	CD3DX12_CPU_DESCRIPTOR_HANDLE Descriptor(SrvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	for(auto& pair : Textures)
+	{
+		std::unique_ptr<Texture>& tex = pair.second;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = tex->Resource->GetDesc().Format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+		srvDesc.Texture2D.MipLevels = tex->Resource->GetDesc().MipLevels;
+		srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+		Device->CreateShaderResourceView(tex->Resource.Get(), &srvDesc, Descriptor);
+		Descriptor.Offset(1, CbvSrvUavDescriptorSize);
 	}
 }
 
@@ -957,6 +999,10 @@ void DemoApp::LoadTextures()
 		UploadBatch,
 		riverPebbleTexture->Filename.c_str(),
 		riverPebbleTexture->Resource.GetAddressOf()));
+	
+	Textures[riverPebbleTexture->Name] = std::move(riverPebbleTexture);
+
+	UploadBatch.End(CommandQueue.Get());
 
 
 }
