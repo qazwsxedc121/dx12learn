@@ -249,3 +249,17 @@ struct Texture
     ComPtr<ID3D12Resource> Resource = nullptr;
     ComPtr<ID3D12Resource> UploadHeap = nullptr;
 };
+
+struct TextureDesc
+{
+    std::string Name;
+    std::wstring Filename;
+
+    TextureDesc(std::string name, std::wstring filename) :
+        Name(name),
+        Filename(filename)
+    {
+    }
+
+    TextureDesc() = delete;
+};

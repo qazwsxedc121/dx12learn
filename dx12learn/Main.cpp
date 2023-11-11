@@ -121,7 +121,8 @@ protected:
 	FrameResource* CurrentFrameResource = nullptr;
 	int CurrentFrameResourceIndex = 0;
 
-	std::unordered_map<std::string, std::unique_ptr<Texture>> Textures;
+	std::vector<std::unique_ptr<Texture>> Textures;
+	std::unordered_map<std::string, int> TextureNameMap;
 
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
@@ -607,7 +608,7 @@ void DemoApp::BuildRenderItems()
 		ritem->IndexCount = ritem->Geo->DrawArgs[objName].IndexCount;
 		ritem->StartIndexLocation = ritem->Geo->DrawArgs[objName].StartIndexLocation;
 		ritem->BaseVertexLocation = ritem->Geo->DrawArgs[objName].BaseVertexLocation;
-		ritem->Mat = Materials["grass"].get();
+		ritem->Mat = Materials["wood"].get();
 		AllRitems.push_back(std::move(ritem));
 	}
 
@@ -619,7 +620,7 @@ void DemoApp::BuildRenderItems()
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-	gridRitem->Mat = Materials["grass"].get();
+	gridRitem->Mat = Materials["rock"].get();
 	AllRitems.push_back(std::move(gridRitem));
 
 	auto wavesRitem = std::make_unique<RenderItem>();
@@ -630,7 +631,7 @@ void DemoApp::BuildRenderItems()
 	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["water"].IndexCount;
 	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["water"].StartIndexLocation;
 	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["water"].BaseVertexLocation;
-	wavesRitem->Mat = Materials["water"].get();
+	wavesRitem->Mat = Materials["grass"].get();
 	this->WaveRitem = wavesRitem.get();
 	AllRitems.push_back(std::move(wavesRitem));
 
@@ -651,16 +652,26 @@ void DemoApp::BuildMaterials()
 	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass->Roughness = 0.125f;
 
-	auto water = std::make_unique<Material>();
-	water->Name = "water";
-	water->MatCBIndex = 1;
-	water->DiffuseSrvHeapIndex = 0;
-	water->DiffuseAlbedo = XMFLOAT4(0.5f, 0.5f, 1.0f, 1.0f);
-	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->Roughness = 0.0f;
+	auto rock = std::make_unique<Material>();
+	rock->Name = "rock";
+	rock->MatCBIndex = 1;
+	rock->DiffuseSrvHeapIndex = 1;
+	rock->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
+	rock->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	rock->Roughness = 0.125f;
+
+	auto wood = std::make_unique<Material>();
+	wood->Name = "wood";
+	wood->MatCBIndex = 2;
+	wood->DiffuseSrvHeapIndex = 2;
+	wood->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
+	wood->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	wood->Roughness = 0.125f;
+
 
 	Materials["grass"] = std::move(grass);
-	Materials["water"] = std::move(water);
+	Materials["rock"] = std::move(rock);
+	Materials["wood"] = std::move(wood);
 }
 
 void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vector<RenderItem *> &ritems)
@@ -747,7 +758,7 @@ void DemoApp::BuildDescriptorHeaps()
 	ThrowIfFailed(Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(CbvHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
-	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.NumDescriptors = Textures.size();
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	srvHeapDesc.NodeMask = 0;
@@ -758,7 +769,7 @@ void DemoApp::BuildFrameResources()
 {
 	for(int i = 0; i < NumFrameResources; ++i)
 	{
-		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), 2, 128*128));
+		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, (UINT)AllRitems.size(), Materials.size(), 128 * 128));
 	}
 }
 
@@ -810,9 +821,8 @@ void DemoApp::BuildShaderResourceView()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE Descriptor(SrvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	for(auto& pair : Textures)
+	for(auto& tex : Textures)
 	{
-		std::unique_ptr<Texture>& tex = pair.second;
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = tex->Resource->GetDesc().Format;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -988,6 +998,7 @@ void DemoApp::UpdateWave(const GameTimer& gt)
 		v.Pos = Wave->GetPosition(i);
 		v.Color = XMFLOAT4(DirectX::Colors::Blue);
 		v.Normal = Wave->GetNormal(i);
+		v.TexC = Wave->GetTexC(i);
 
 		currWavesVB->CopyData(i, v);
 	}
@@ -997,18 +1008,22 @@ void DemoApp::UpdateWave(const GameTimer& gt)
 
 void DemoApp::LoadTextures()
 {
-	auto riverPebbleTexture = std::make_unique<Texture>();
-	riverPebbleTexture->Name = "riverPebbleTex";
-	riverPebbleTexture->Filename = L"./Textures/ganges_river_pebbles_1k/textures/ganges_river_pebbles_diff_1k.dds";
 	DirectX::ResourceUploadBatch UploadBatch(Device.Get());
 	UploadBatch.Begin();
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile(
-		Device.Get(),
-		UploadBatch,
-		riverPebbleTexture->Filename.c_str(),
-		riverPebbleTexture->Resource.GetAddressOf()));
-	
-	Textures[riverPebbleTexture->Name] = std::move(riverPebbleTexture);
+	std::vector<TextureDesc> TextureDescs = {
+		{"forrest_ground", L"./Textures/forrest_ground_01_1k/forrest_ground_01_diff_1k.dds"},
+		{"river_pebble", L"./Textures/ganges_river_pebbles_1k/ganges_river_pebbles_diff_1k.dds"},
+		{"raw_plank_wall", L"./Textures/raw_plank_wall_1k/raw_plank_wall_diff_1k.dds"}
+	};
+	for(const auto& texDesc : TextureDescs)
+	{
+		auto texture = std::make_unique<Texture>();
+		texture->Name = texDesc.Name;
+		texture->Filename = texDesc.Filename;
+		ThrowIfFailed(DirectX::CreateDDSTextureFromFile(Device.Get(), UploadBatch, texture->Filename.c_str(), texture->Resource.GetAddressOf()));
+		TextureNameMap[texture->Name] = Textures.size();
+		Textures.push_back(std::move(texture));
+	}
 
 	UploadBatch.End(CommandQueue.Get());
 

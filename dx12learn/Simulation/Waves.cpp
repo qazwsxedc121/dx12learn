@@ -26,6 +26,7 @@ Waves::Waves(int m, int n, float dx, float dt, float speed, float damping)
     CurrSolution.resize(VertexCount);
     Normals.resize(VertexCount);
     TangentX.resize(VertexCount);
+    TexCoord.resize(VertexCount);
 
     // Generate grid vertices in system memory.
 
@@ -42,6 +43,7 @@ Waves::Waves(int m, int n, float dx, float dt, float speed, float damping)
             CurrSolution[i * n + j] = XMFLOAT3(x, 0.0f, z);
             Normals[i * n + j] = XMFLOAT3(0.0f, 1.0f, 0.0f);
             TangentX[i * n + j] = XMFLOAT3(1.0f, 0.0f, 0.0f);
+            TexCoord[i * n + j] = XMFLOAT2(j / (n - 1.0f), i / (m - 1.0f));
         }
     }
 }

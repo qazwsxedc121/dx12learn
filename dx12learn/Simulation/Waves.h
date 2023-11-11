@@ -20,6 +20,7 @@ public:
     const DirectX::XMFLOAT3& GetPosition(int i)const { return CurrSolution[i]; }
     const DirectX::XMFLOAT3& GetNormal(int i)const { return Normals[i]; }
     const DirectX::XMFLOAT3& GetTangentX(int i)const { return TangentX[i]; }
+    const DirectX::XMFLOAT2& GetTexC(int i)const { return TexCoord[i]; }
 
     void Update(float dt);
     void Disturb(int i, int j, float magnitude);
@@ -42,4 +43,5 @@ private:
     std::vector<DirectX::XMFLOAT3> CurrSolution;
     std::vector<DirectX::XMFLOAT3> Normals;
     std::vector<DirectX::XMFLOAT3> TangentX;
+    std::vector<DirectX::XMFLOAT2> TexCoord;
 };
