@@ -113,6 +113,8 @@ protected:
 	virtual void OnKeyboardInput(const GameTimer& gt);
 
 protected:
+	simdjson::ondemand::document scene_doc;
+
 	ComPtr<ID3D12RootSignature> RootSignature;
 	ComPtr<ID3D12DescriptorHeap> CbvHeap;
 	ComPtr<ID3D12DescriptorHeap> SrvHeap;
@@ -278,6 +280,10 @@ void DemoApp::Init()
 {
 	OutputDebugStringA("Init Start\n");
 	D3D12App::Init();
+
+	simdjson::ondemand::parser Parser;
+	auto json = simdjson::padded_string::load("./Assets/Data/scene.json");
+	scene_doc = Parser.iterate(json);
 
 	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), nullptr));
 
@@ -644,34 +650,22 @@ void DemoApp::BuildRenderItems()
 
 void DemoApp::BuildMaterials()
 {
-	auto grass = std::make_unique<Material>();
-	grass->Name = "grass";
-	grass->MatCBIndex = 0;
-	grass->DiffuseSrvHeapIndex = 0;
-	grass->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
-	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass->Roughness = 0.125f;
+	simdjson::ondemand::array arr = scene_doc["material"].get_array();
+	int i = 0;
+	for (auto element : arr)
+	{
+		auto mat = std::make_unique<Material>();
+		mat->Name = std::string(std::string_view(element["name"]));
+		mat->MatCBIndex = i;
+		mat->DiffuseSrvHeapIndex = element["diffuse_tex"].get_int64();
+		auto fresnelR0 = element["fresnel_r0"].get_array();
+		
+		JsonUtil::FromJsonArray(fresnelR0.value(), mat->FresnelR0);
+		mat->Roughness = double(element["roughness"]);
+		Materials[mat->Name] = std::move(mat);
+		++i;
+	}
 
-	auto rock = std::make_unique<Material>();
-	rock->Name = "rock";
-	rock->MatCBIndex = 1;
-	rock->DiffuseSrvHeapIndex = 1;
-	rock->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
-	rock->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	rock->Roughness = 0.125f;
-
-	auto wood = std::make_unique<Material>();
-	wood->Name = "wood";
-	wood->MatCBIndex = 2;
-	wood->DiffuseSrvHeapIndex = 2;
-	wood->DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
-	wood->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	wood->Roughness = 0.125f;
-
-
-	Materials["grass"] = std::move(grass);
-	Materials["rock"] = std::move(rock);
-	Materials["wood"] = std::move(wood);
 }
 
 void DemoApp::DrawRenderItems(ID3D12GraphicsCommandList *cmdList, const std::vector<RenderItem *> &ritems)
@@ -1010,16 +1004,15 @@ void DemoApp::LoadTextures()
 {
 	DirectX::ResourceUploadBatch UploadBatch(Device.Get());
 	UploadBatch.Begin();
-	std::vector<TextureDesc> TextureDescs = {
-		{"forrest_ground", L"./Textures/forrest_ground_01_1k/forrest_ground_01_diff_1k.dds"},
-		{"river_pebble", L"./Textures/ganges_river_pebbles_1k/ganges_river_pebbles_diff_1k.dds"},
-		{"raw_plank_wall", L"./Textures/raw_plank_wall_1k/raw_plank_wall_diff_1k.dds"}
-	};
-	for(const auto& texDesc : TextureDescs)
+
+	simdjson::ondemand::array arr = scene_doc["texture"].get_array();
+	for (auto element : arr)
 	{
+		std::string_view name = element["name"];
+		std::string_view path = element["path"];
 		auto texture = std::make_unique<Texture>();
-		texture->Name = texDesc.Name;
-		texture->Filename = texDesc.Filename;
+		texture->Name = std::string(name);
+		texture->Filename = std::wstring(path.begin(), path.end());
 		ThrowIfFailed(DirectX::CreateDDSTextureFromFile(Device.Get(), UploadBatch, texture->Filename.c_str(), texture->Resource.GetAddressOf()));
 		TextureNameMap[texture->Name] = Textures.size();
 		Textures.push_back(std::move(texture));

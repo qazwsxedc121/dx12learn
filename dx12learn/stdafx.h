@@ -8,6 +8,8 @@
 #include <DirectXColors.h>
 #include "d3dx12.h"
 
+#include "simdjson.h"
+
 #include <string>
 #include <wrl.h>
 #include <shellapi.h>

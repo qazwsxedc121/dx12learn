@@ -1,5 +1,6 @@
 #include "D3DUtil.h"
 #include <fstream>
+#include <array>
 
 using Microsoft::WRL::ComPtr;
 
@@ -77,4 +78,28 @@ ComPtr<ID3DBlob> D3DUtil::CompileShader(const std::wstring &filename, const D3D_
     }
     ThrowIfFailed(hr);
     return byteCode;
+}
+
+bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT3& out)
+{
+    std::array<double, 3> arr = {0.0, 0.0, 0.0};
+    int idx = 0;
+    for(auto i: JsonArray)
+    {
+        arr[idx++] = i.get_double();
+    }
+    out = XMFLOAT3(arr[0], arr[1], arr[2]);
+    return true;
+}
+
+bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT4& out)
+{
+    std::array<double, 4> arr = { 0.0, 0.0, 0.0 };
+    int idx = 0;
+    for (auto i : JsonArray)
+    {
+        arr[idx++] = i.get_double();
+    }
+    out = XMFLOAT4(arr[0], arr[1], arr[2], arr[3]);
+    return true;
 }

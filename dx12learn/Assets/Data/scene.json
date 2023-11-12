@@ -1,0 +1,36 @@
+{
+    "material" : [
+        {
+            "name": "grass",
+            "diffuse_tex": 0,
+            "fresnel_r0": [0.01, 0.01, 0.01],
+            "roughness": 0.5
+        },
+        {
+            "name": "rock",
+            "diffuse_tex": 1,
+            "fresnel_r0": [0.01, 0.01, 0.01],
+            "roughness": 0.5
+        },
+        {
+            "name": "wood",
+            "diffuse_tex": 2,
+            "fresnel_r0": [0.01, 0.01, 0.01],
+            "roughness": 0.5
+        }
+    ],
+    "texture": [
+        {
+            "name":"forrest_ground", 
+            "path":"./Textures/forrest_ground_01_1k/forrest_ground_01_diff_1k.dds"
+        },
+        {
+            "name": "river_pebble", 
+            "path": "./Textures/ganges_river_pebbles_1k/ganges_river_pebbles_diff_1k.dds"
+        },
+        {
+            "name": "raw_plank_wall", 
+            "path": "./Textures/raw_plank_wall_1k/raw_plank_wall_diff_1k.dds"
+        }
+    ]
+}

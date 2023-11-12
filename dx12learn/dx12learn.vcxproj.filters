@@ -69,6 +69,9 @@
     <ClCompile Include="MeshBuilder\MeshObjBuilder.cpp">
       <Filter>源文件\MeshBuilder</Filter>
     </ClCompile>
+    <ClCompile Include="simdjson.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -115,6 +118,9 @@
     </ClInclude>
     <ClInclude Include="MeshBuilder\MeshObjBuilder.h">
       <Filter>头文件\MeshBuilder</Filter>
+    </ClInclude>
+    <ClInclude Include="simdjson.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

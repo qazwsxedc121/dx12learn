@@ -263,3 +263,10 @@ struct TextureDesc
 
     TextureDesc() = delete;
 };
+
+class JsonUtil
+{
+public:
+    static bool FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT3& out);
+    static bool FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT4& out);
+};
