@@ -405,6 +405,7 @@ void DemoApp::BuildShadersAndInputLayout()
 void DemoApp::BuildBoxGeometry()
 {
 	auto mesh_array = scene_doc["mesh"].get_array();
+	std::unordered_map<std::string, std::string> MaterialNameMap;
 	for(auto element : mesh_array)
 	{
 		std::string meshName = std::string(std::string_view(element["name"]));
@@ -412,6 +413,9 @@ void DemoApp::BuildBoxGeometry()
 		auto ParamObj = element["param"].get_object();
 
 		MeshBuilder::MeshData meshData;
+
+		MaterialNameMap[meshName] = std::string(std::string_view(element["material"]));
+		
 		if(meshBuilderType == "box")
 		{
 			float width = ParamObj["width"].get_double();
@@ -467,6 +471,7 @@ void DemoApp::BuildBoxGeometry()
 		submesh.IndexCount = (UINT)pair.second.Indices32.size();
 		submesh.StartIndexLocation = indexOffset;
 		submesh.BaseVertexLocation = vertexOffset;
+		submesh.MaterialName = MaterialNameMap[pair.first];
 		submeshGeometries[pair.first] = submesh;
 
 		vertexOffset += (UINT)pair.second.Vertices.size();
@@ -589,6 +594,7 @@ void DemoApp::BuildLandGeometry()
 	submesh.IndexCount = (UINT)indices.size();
 	submesh.StartIndexLocation = 0;
 	submesh.BaseVertexLocation = 0;
+	submesh.MaterialName = "grass";
 
 	geo->DrawArgs["grid"] = submesh;
 
@@ -664,7 +670,8 @@ void DemoApp::BuildRenderItems()
 		ritem->IndexCount = ritem->Geo->DrawArgs[objName].IndexCount;
 		ritem->StartIndexLocation = ritem->Geo->DrawArgs[objName].StartIndexLocation;
 		ritem->BaseVertexLocation = ritem->Geo->DrawArgs[objName].BaseVertexLocation;
-		ritem->Mat = Materials["wood"].get();
+		ritem->Mat = Materials[ritem->Geo->DrawArgs[objName].MaterialName].get();
+
 		AllRitems.push_back(std::move(ritem));
 	}
 
@@ -676,7 +683,7 @@ void DemoApp::BuildRenderItems()
 	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
 	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-	gridRitem->Mat = Materials["rock"].get();
+	gridRitem->Mat = Materials[gridRitem->Geo->DrawArgs["grid"].MaterialName].get();
 	AllRitems.push_back(std::move(gridRitem));
 
 	auto wavesRitem = std::make_unique<RenderItem>();

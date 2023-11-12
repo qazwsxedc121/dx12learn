@@ -8,7 +8,8 @@
                 "height": 1.5,
                 "depth": 1.5,
                 "num_subdivision": 3
-            }
+            },
+            "material": "rock"
         },
         {
             "name": "sphere",
@@ -17,7 +18,8 @@
                 "radius": 0.5,
                 "slice": 20,
                 "stack": 20
-            }
+            },
+            "material": "wood"
         },
         {
             "name": "cylinder",
@@ -28,7 +30,8 @@
                 "height": 3.0,
                 "slice": 20,
                 "stack": 20
-            }
+            },
+            "material": "wood"
         },
         {
             "name": "grid",
@@ -38,14 +41,16 @@
                 "depth": 30.0,
                 "m": 60,
                 "n": 40
-            }
+            },
+            "material": "rock"
         },
         {
             "name": "teapot",
             "type": "obj",
             "param": {
                 "path": "./Assets/Model/teapot.wobj"
-            }
+            },
+            "material": "wood"
         }
     ],
     "mesh_instance" : [

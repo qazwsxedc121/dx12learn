@@ -103,6 +103,7 @@ struct SubmeshGeometry
     INT BaseVertexLocation = 0;
 
     DirectX::BoundingBox Bounds;
+    std::string MaterialName;
 };
 
 struct MeshGeometry
