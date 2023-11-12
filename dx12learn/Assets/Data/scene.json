@@ -1,4 +1,148 @@
 {
+    "mesh" : [
+        {
+            "name": "box",
+            "type": "box",
+            "param": {
+                "width": 1.0,
+                "height": 1.5,
+                "depth": 1.5,
+                "num_subdivision": 3
+            }
+        },
+        {
+            "name": "sphere",
+            "type": "sphere",
+            "param": {
+                "radius": 0.5,
+                "slice": 20,
+                "stack": 20
+            }
+        },
+        {
+            "name": "cylinder",
+            "type": "cylinder",
+            "param": {
+                "bottom_radius": 0.5,
+                "top_radius": 0.3,
+                "height": 3.0,
+                "slice": 20,
+                "stack": 20
+            }
+        },
+        {
+            "name": "grid",
+            "type": "grid",
+            "param": {
+                "width": 20.0,
+                "depth": 30.0,
+                "m": 60,
+                "n": 40
+            }
+        },
+        {
+            "name": "teapot",
+            "type": "obj",
+            "param": {
+                "path": "./Assets/Model/teapot.wobj"
+            }
+        }
+    ],
+    "mesh_instance" : [
+        {
+            "name": "box", 
+            "world": [0.0, 0.5, 0.0]
+        },
+        {
+            "name": "grid"
+        },
+        {
+            "name": "teapot",
+            "world": [0.0, 2.5, 0.0],
+            "scale": [1.0, 1.5, 1.0],
+            "euler": [0.0, 1.0, 0.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [-5.0, 1.5, -10.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [-5.0, 1.5, -5.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [-5.0, 1.5, 0.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [-5.0, 1.5, 5.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [-5.0, 1.5, 10.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [5.0, 1.5, -10.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [5.0, 1.5, -5.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [5.0, 1.5, 0.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [5.0, 1.5, 5.0]
+        },
+        {
+            "name": "cylinder",
+            "world": [5.0, 1.5, 10.0]
+        },
+        {
+            "name": "sphere",
+            "world": [-5.0, 3.5, -10.0]
+        },
+        {
+            "name": "sphere",
+            "world": [-5.0, 3.5, -5.0]
+        },
+        {
+            "name": "sphere",
+            "world": [-5.0, 3.5, 0.0]
+        },
+        {
+            "name": "sphere",
+            "world": [-5.0, 3.5, 5.0]
+        },
+        {
+            "name": "sphere",
+            "world": [-5.0, 3.5, 10.0]
+        },
+        {
+            "name": "sphere",
+            "world": [5.0, 3.5, -10.0]
+        },
+        {
+            "name": "sphere",
+            "world": [5.0, 3.5, -5.0]
+        },
+        {
+            "name": "sphere",
+            "world": [5.0, 3.5, 0.0]
+        },
+        {
+            "name": "sphere",
+            "world": [5.0, 3.5, 5.0]
+        },
+        {
+            "name": "sphere",
+            "world": [5.0, 3.5, 10.0]
+        }
+    ],
     "material" : [
         {
             "name": "grass",

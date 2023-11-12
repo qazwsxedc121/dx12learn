@@ -65,6 +65,8 @@ public:
 		{
 
 		}
+
+		RenderItemWorldInfo() = default;
 	};
 
 	DemoApp(HINSTANCE hInstance) : D3D12App(hInstance)
@@ -402,18 +404,58 @@ void DemoApp::BuildShadersAndInputLayout()
 
 void DemoApp::BuildBoxGeometry()
 {
+	auto mesh_array = scene_doc["mesh"].get_array();
+	for(auto element : mesh_array)
+	{
+		std::string meshName = std::string(std::string_view(element["name"]));
+		std::string meshBuilderType = std::string(std::string_view(element["type"]));
+		auto ParamObj = element["param"].get_object();
 
-	MeshBuilder::MeshData boxData = BoxBuilder().BuildBox(1.0f, 1.5f, 1.5f, 3);
-	MeshBuilder::MeshData sphereData = SphereBuilder().BuildSphere(0.5f, 20, 20);
-	MeshBuilder::MeshData cylinderData = CylinderBuilder().BuildCylinder(0.5f, 0.3f, 3.0f, 20, 20);
-	MeshBuilder::MeshData gridData = GridBuilder().BuildGrid(20.0f, 30.0f, 60, 40);
-	MeshBuilder::MeshData teapotData = MeshObjBuilder().BuildByObjFile("Assets/Model/teapot.wobj");
+		MeshBuilder::MeshData meshData;
+		if(meshBuilderType == "box")
+		{
+			float width = ParamObj["width"].get_double();
+			float height = ParamObj["height"].get_double();
+			float depth = ParamObj["depth"].get_double();
+			int numSubdivisions = ParamObj["num_subdivision"].get_int64();
+			meshData = BoxBuilder().BuildBox(width, height, depth, numSubdivisions);
+		}
+		else if(meshBuilderType == "sphere")
+		{
+			float radius = ParamObj["radius"].get_double();
+			int sliceCount = ParamObj["slice"].get_int64();
+			int stackCount = ParamObj["stack"].get_int64();
+			meshData = SphereBuilder().BuildSphere(radius, sliceCount, stackCount);
+		}
+		else if(meshBuilderType == "cylinder")
+		{
+			float bottomRadius = ParamObj["bottom_radius"].get_double();
+			float topRadius = ParamObj["top_radius"].get_double();
+			float height = ParamObj["height"].get_double();
+			int sliceCount = ParamObj["slice"].get_int64();
+			int stackCount = ParamObj["stack"].get_int64();
+			meshData = CylinderBuilder().BuildCylinder(bottomRadius, topRadius, height, sliceCount, stackCount);
+		}
+		else if(meshBuilderType == "grid")
+		{
+			float width = ParamObj["width"].get_double();
+			float depth = ParamObj["depth"].get_double();
+			int m = ParamObj["m"].get_int64();
+			int n = ParamObj["n"].get_int64();
+			meshData = GridBuilder().BuildGrid(width, depth, m, n);
+		}
+		else if(meshBuilderType == "obj")
+		{
+			std::string filepath = std::string(std::string_view(ParamObj["path"]));
+			meshData = MeshObjBuilder().BuildByObjFile(filepath);
+		}
+		else
+		{
+			throw std::exception("Unknown MeshBuilder Type");
+		}
+		MeshDataMap[meshName] = meshData;
+	}
 
-	MeshDataMap["box"] = boxData;
-	MeshDataMap["sphere"] = sphereData;
-	MeshDataMap["cylinder"] = cylinderData;
-	MeshDataMap["grid"] = gridData;
-	MeshDataMap["teapot"] = teapotData;
 
 	std::unordered_map<std::string, SubmeshGeometry> submeshGeometries;
 	UINT vertexOffset = 0;
@@ -586,18 +628,26 @@ void DemoApp::BuildPSO()
 
 void DemoApp::BuildRenderItems()
 {
-	vector<RenderItemWorldInfo> renderItemWorldInfos = {
-		RenderItemWorldInfo("box", XMFLOAT3(0.0f, 0.5f, 0.0f)),
-		RenderItemWorldInfo("grid", XMFLOAT3(0.0f, 0.0f, 0.0f)),
-		RenderItemWorldInfo("teapot", XMFLOAT3(0.0f, 2.5f, 0.0f)),
-	};
-	for(int i = 0; i < 5; ++i)
+	vector<RenderItemWorldInfo> renderItemWorldInfos;
+	auto instance_doc = scene_doc["mesh_instance"].get_array();
+	for(auto element : instance_doc)
 	{
-		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f)));
-		renderItemWorldInfos.push_back(RenderItemWorldInfo("cylinder", XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f)));
-
-		renderItemWorldInfos.push_back(RenderItemWorldInfo("sphere", XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f)));
-		renderItemWorldInfos.push_back(RenderItemWorldInfo("sphere", XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f)));
+		std::string meshName = std::string(std::string_view(element["name"]));
+		RenderItemWorldInfo renderItemWorldInfo;
+		renderItemWorldInfo.ObjName = meshName;
+		if(element.find_field("world").error() != simdjson::NO_SUCH_FIELD)
+		{
+			JsonUtil::FromJsonArray(element["world"].get_array(), renderItemWorldInfo.WorldPos);
+		}
+		if(element.find_field("scale").error() != simdjson::NO_SUCH_FIELD)
+		{
+			JsonUtil::FromJsonArray(element["scale"].get_array(), renderItemWorldInfo.Scale);
+		}
+		if(element.find_field("euler").error() != simdjson::NO_SUCH_FIELD)
+		{
+			JsonUtil::FromJsonArray(element["euler"].get_array(), renderItemWorldInfo.Euler);
+		}
+		renderItemWorldInfos.push_back(renderItemWorldInfo);
 	}
 
 	for(size_t i = 0; i < renderItemWorldInfos.size(); ++i)
