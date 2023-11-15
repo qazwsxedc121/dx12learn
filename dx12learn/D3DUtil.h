@@ -268,6 +268,16 @@ struct TextureDesc
 class JsonUtil
 {
 public:
-    static bool FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT3& out);
-    static bool FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT4& out);
+    static bool FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT3& out);
+    static bool FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT4& out);
+    static bool FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT4X4& out);
+
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, int& out);
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, float& out);
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, std::string_view& out);
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, XMFLOAT3& out);
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, XMFLOAT4& out);
+    static bool ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char* key, XMFLOAT4X4& out);
+
+
 };

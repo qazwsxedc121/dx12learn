@@ -80,7 +80,7 @@ ComPtr<ID3DBlob> D3DUtil::CompileShader(const std::wstring &filename, const D3D_
     return byteCode;
 }
 
-bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT3& out)
+bool JsonUtil::FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT3& out)
 {
     std::array<double, 3> arr = {0.0, 0.0, 0.0};
     int idx = 0;
@@ -92,9 +92,9 @@ bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT3& out)
     return true;
 }
 
-bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT4& out)
+bool JsonUtil::FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT4& out)
 {
-    std::array<double, 4> arr = { 0.0, 0.0, 0.0 };
+    std::array<double, 4> arr = { 0.0, 0.0, 0.0, 0.0 };
     int idx = 0;
     for (auto i : JsonArray)
     {
@@ -102,4 +102,90 @@ bool JsonUtil::FromJsonArray(simdjson::ondemand::array JsonArray, XMFLOAT4& out)
     }
     out = XMFLOAT4(arr[0], arr[1], arr[2], arr[3]);
     return true;
+}
+
+bool JsonUtil::FromJsonArray(simdjson::ondemand::array& JsonArray, XMFLOAT4X4 &out)
+{
+    std::array<double, 16> arr = { 0.0, 0.0, 0.0, 0.0 };
+    int idx = 0;
+    for (auto i : JsonArray)
+    {
+        arr[idx++] = i.get_double();
+    }
+    out = XMFLOAT4X4(
+        arr[0], arr[1], arr[2], arr[3],
+        arr[4], arr[5], arr[6], arr[7],
+        arr[8], arr[9], arr[10], arr[11],
+        arr[12], arr[13], arr[14], arr[15]);
+    return true;
+}
+
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, int &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        out = val.get_int64();
+        return true;
+    }
+    return false;
+}
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, float &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        out = val.get_double();
+        return true;
+    }
+    return false;
+}
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, std::string_view &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        out = val.get_string();
+        return true;
+    }
+    return false;
+}
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, XMFLOAT3 &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        auto arr = val.get_array().value();
+        FromJsonArray(arr, out);
+        return true;
+    }
+    return false;
+}
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, XMFLOAT4 &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        auto arr = val.get_array().value();
+        FromJsonArray(arr, out);
+        return true;
+    }
+    return false;
+}
+
+bool JsonUtil::ExtractFieldFromObject(simdjson::ondemand::object& JsonObject, const char *key, XMFLOAT4X4 &out)
+{
+    simdjson::ondemand::value val{};
+    if(!JsonObject[key].get(val))
+    {
+        auto arr = val.get_array().value();
+        FromJsonArray(arr, out);
+        return true;
+    }
+    return false;
 }

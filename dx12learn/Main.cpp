@@ -33,6 +33,13 @@ namespace DX
 
 }
 
+enum class RenderLayer : int
+{
+	Opaque = 0,
+	Transparent = 1,
+	AlphaTested = 2,
+	Count
+};
 
 
 class DemoApp : public D3D12App
@@ -130,11 +137,14 @@ protected:
 
 	ComPtr<ID3DBlob> VertexShader;
 	ComPtr<ID3DBlob> PixelShader;
+	ComPtr<ID3DBlob> TransparentPixelShader;
+	ComPtr<ID3DBlob> AlphaTestPixelShader;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> InputLayout;
 
 	std::vector<std::unique_ptr<RenderItem>> AllRitems;
-	std::vector<RenderItem*> OpaqueRitems;
+	std::vector<RenderItem*> RitemLayer[(int)RenderLayer::Count];
+
 
 	RenderItem* WaveRitem;
 
@@ -142,7 +152,9 @@ protected:
 
 	UINT PassCbvOffset = 0;
 
-	ComPtr<ID3D12PipelineState> PipelineState;
+	ComPtr<ID3D12PipelineState> OpaquePipelineState;
+	ComPtr<ID3D12PipelineState> AlphaTestPipelineState;
+	ComPtr<ID3D12PipelineState> TransparentPipelineState;
 
 	float Radius = 15.0f;
 	float Theta = 1.5f * XM_PI;
@@ -236,7 +248,7 @@ void DemoApp::Render(const GameTimer& gt)
 
 
 	ThrowIfFailed(CommandAllocator->Reset());
-	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), PipelineState.Get()));
+	ThrowIfFailed(CommandList->Reset(CommandAllocator.Get(), OpaquePipelineState.Get()));
 
 	CommandList->RSSetViewports(1, &Viewport);
 	CommandList->RSSetScissorRects(1, &ScissorRect);
@@ -261,7 +273,13 @@ void DemoApp::Render(const GameTimer& gt)
 
 	CommandList->SetGraphicsRootConstantBufferView(1, CurrentFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
 
-	DrawRenderItems(CommandList.Get(), OpaqueRitems);
+	DrawRenderItems(CommandList.Get(), RitemLayer[(int)RenderLayer::Opaque]);
+
+	CommandList->SetPipelineState(AlphaTestPipelineState.Get());
+	DrawRenderItems(CommandList.Get(), RitemLayer[(int)RenderLayer::AlphaTested]);
+
+	CommandList->SetPipelineState(TransparentPipelineState.Get());
+	DrawRenderItems(CommandList.Get(), RitemLayer[(int)RenderLayer::Transparent]);
 
 	D3D12_RESOURCE_BARRIER renderTargetToPresent = CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
@@ -387,8 +405,22 @@ void DemoApp::BuildRootSignature()
 void DemoApp::BuildShadersAndInputLayout()
 {
 	HRESULT hr = S_OK;
+
+	const D3D_SHADER_MACRO defines[] =
+	{
+		"FOG", "1",
+		NULL, NULL
+	};
+	const D3D_SHADER_MACRO alphaTestDefines[] =
+	{
+		"FOG", "1",
+		"ALPHA_TEST", "1",
+		NULL, NULL
+	};
 	VertexShader = D3DUtil::CompileShader(L"Shaders/VertexShader.hlsl", nullptr, "VS", "vs_5_0");
-	PixelShader = D3DUtil::CompileShader(L"Shaders/PixelShader.hlsl", nullptr, "PS", "ps_5_0");
+	PixelShader = D3DUtil::CompileShader(L"Shaders/PixelShader.hlsl", defines, "PS", "ps_5_0");
+	TransparentPixelShader = D3DUtil::CompileShader(L"Shaders/PixelShader.hlsl", nullptr, "PS", "ps_5_0");
+	AlphaTestPixelShader = D3DUtil::CompileShader(L"Shaders/PixelShader.hlsl", alphaTestDefines, "PS", "ps_5_0");
 
 	InputLayout = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
@@ -628,7 +660,38 @@ void DemoApp::BuildPSO()
 	psoDesc.SampleDesc.Count = 1;
 	psoDesc.SampleDesc.Quality = 0;
 	psoDesc.DSVFormat = DepthStencilFormat;
-	ThrowIfFailed(Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(PipelineState.GetAddressOf())));
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(OpaquePipelineState.GetAddressOf())));
+
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = psoDesc;
+	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+	transparencyBlendDesc.BlendEnable = true;
+	transparencyBlendDesc.LogicOpEnable = false;
+	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+	transparentPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(TransparentPixelShader->GetBufferPointer()),
+		TransparentPixelShader->GetBufferSize()
+	};
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(TransparentPipelineState.GetAddressOf())));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestPsoDesc = psoDesc;
+	alphaTestPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(AlphaTestPixelShader->GetBufferPointer()),
+		AlphaTestPixelShader->GetBufferSize()
+	};
+	alphaTestPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&alphaTestPsoDesc, IID_PPV_ARGS(AlphaTestPipelineState.GetAddressOf())));
 
 }
 
@@ -638,21 +701,16 @@ void DemoApp::BuildRenderItems()
 	auto instance_doc = scene_doc["mesh_instance"].get_array();
 	for(auto element : instance_doc)
 	{
-		std::string meshName = std::string(std::string_view(element["name"]));
+		auto element_value = element.get_object().value();
+		std::string meshName = std::string(std::string_view(element_value["name"]));
 		RenderItemWorldInfo renderItemWorldInfo;
 		renderItemWorldInfo.ObjName = meshName;
-		if(element.find_field("world").error() != simdjson::NO_SUCH_FIELD)
-		{
-			JsonUtil::FromJsonArray(element["world"].get_array(), renderItemWorldInfo.WorldPos);
-		}
-		if(element.find_field("scale").error() != simdjson::NO_SUCH_FIELD)
-		{
-			JsonUtil::FromJsonArray(element["scale"].get_array(), renderItemWorldInfo.Scale);
-		}
-		if(element.find_field("euler").error() != simdjson::NO_SUCH_FIELD)
-		{
-			JsonUtil::FromJsonArray(element["euler"].get_array(), renderItemWorldInfo.Euler);
-		}
+
+
+		JsonUtil::ExtractFieldFromObject(element_value, "world", renderItemWorldInfo.WorldPos);
+		JsonUtil::ExtractFieldFromObject(element_value, "scale", renderItemWorldInfo.Scale);
+		JsonUtil::ExtractFieldFromObject(element_value, "euler", renderItemWorldInfo.Euler);
+
 		renderItemWorldInfos.push_back(renderItemWorldInfo);
 	}
 
@@ -673,6 +731,7 @@ void DemoApp::BuildRenderItems()
 		ritem->Mat = Materials[ritem->Geo->DrawArgs[objName].MaterialName].get();
 
 		AllRitems.push_back(std::move(ritem));
+		RitemLayer[(int)RenderLayer::Opaque].push_back(AllRitems.back().get());
 	}
 
 	auto gridRitem = std::make_unique<RenderItem>();
@@ -685,6 +744,7 @@ void DemoApp::BuildRenderItems()
 	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 	gridRitem->Mat = Materials[gridRitem->Geo->DrawArgs["grid"].MaterialName].get();
 	AllRitems.push_back(std::move(gridRitem));
+	RitemLayer[(int)RenderLayer::Opaque].push_back(AllRitems.back().get());
 
 	auto wavesRitem = std::make_unique<RenderItem>();
 	wavesRitem->World = MathHelper::Identity4x4();
@@ -694,15 +754,11 @@ void DemoApp::BuildRenderItems()
 	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["water"].IndexCount;
 	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["water"].StartIndexLocation;
 	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["water"].BaseVertexLocation;
-	wavesRitem->Mat = Materials["grass"].get();
+	wavesRitem->Mat = Materials["water"].get();
 	this->WaveRitem = wavesRitem.get();
 	AllRitems.push_back(std::move(wavesRitem));
+	RitemLayer[(int)RenderLayer::Transparent].push_back(AllRitems.back().get());
 
-
-	for(auto& e : AllRitems)
-	{
-		OpaqueRitems.push_back(e.get());
-	}
 }
 
 void DemoApp::BuildMaterials()
@@ -711,14 +767,18 @@ void DemoApp::BuildMaterials()
 	int i = 0;
 	for (auto element : arr)
 	{
+		auto element_value = element.get_object().value();
 		auto mat = std::make_unique<Material>();
-		mat->Name = std::string(std::string_view(element["name"]));
+		mat->Name = std::string(std::string_view(element_value["name"]));
 		mat->MatCBIndex = i;
-		mat->DiffuseSrvHeapIndex = element["diffuse_tex"].get_int64();
-		auto fresnelR0 = element["fresnel_r0"].get_array();
-		
-		JsonUtil::FromJsonArray(fresnelR0.value(), mat->FresnelR0);
-		mat->Roughness = double(element["roughness"]);
+
+
+		JsonUtil::ExtractFieldFromObject(element_value, "diffuse_tex", mat->DiffuseSrvHeapIndex);
+		JsonUtil::ExtractFieldFromObject(element_value, "diffuse_albedo", mat->DiffuseAlbedo);
+		JsonUtil::ExtractFieldFromObject(element_value, "fresnel_r0", mat->FresnelR0);
+		JsonUtil::ExtractFieldFromObject(element_value, "roughness", mat->Roughness);
+		JsonUtil::ExtractFieldFromObject(element_value, "mat_transform", mat->MatTransform);
+
 		Materials[mat->Name] = std::move(mat);
 		++i;
 	}
