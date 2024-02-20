@@ -10,7 +10,7 @@
 
 ## snapshot
 
-![snap](/Doc/snap1.png, "snap")
+![snap](https://github.com/qazwsxedc121/dx12learn/blob/main/dx12learn/Doc/snap1.png)
 
 ## how to use
 
